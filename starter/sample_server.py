@@ -1,5 +1,12 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
+import argparse
+import os
+import os.path as osp
+
+global WAL_PATH
+global SSTABLE_FOLDER
+global METADATA_PATH
 
 class MyHandler(BaseHTTPRequestHandler):
     def _set_response(self, code):
@@ -46,15 +53,46 @@ class MyHandler(BaseHTTPRequestHandler):
         self._set_response(200)
 
 
+def get_args_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('tablet_hostname', type=str, help='tablet hostname address')
+    parser.add_argument('tablet_port', type=int, help='tablet port number')
+    parser.add_argument('master_hostname', type=str, help='master hostname address')
+    parser.add_argument('master_port', type=int, help='master port number')
+    parser.add_argument('WAL', type=str, help='path to Write Ahead Log (WAL) file')
+    parser.add_argument('sstable_folder', type=str, help='path to SSTable folder')
+    return parser
+
+
+
 if __name__ == "__main__":
-    server_address = ("localhost", 8080)
+    parser = get_args_parser()
+    args = parser.parse_args()
+
+    global WAL_PATH
+    WAL_PATH = args.WAL
+    global SSTABLE_FOLDER
+    SSTABLE_FOLDER = args.sstable_folder
+    global METADATA_PATH
+    METADATA_PATH = osp.join(SSTABLE_FOLDER, 'metadata.json')
+
+    if not osp.exists(WAL_PATH):
+        os.mknod(WAL_PATH)
+
+    if not osp.exists(SSTABLE_FOLDER):
+        os.makedirs(SSTABLE_FOLDER)
+
+    if not osp.exists(METADATA_PATH):
+        os.mknod(METADATA_PATH)
+
+    server_address = (args.tablet_hostname, args.tablet_port)
     handler_class = MyHandler
     server_class = HTTPServer
 
     httpd = HTTPServer(server_address, handler_class)
     print("sample server running...")
 
-    try: 
+    try:
         httpd.serve_forever()
     except KeyboardInterrupt: pass
 

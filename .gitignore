@@ -4,3 +4,6 @@ SSTABLE
 __pycache__
 hosts.mk
 Makefile
+WAL.json
+grading
+test

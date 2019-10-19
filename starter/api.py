@@ -22,39 +22,33 @@ def list_tables() -> List[str]:
     return list(metadata.keys())
 
 
-def create_table(table_schema: str):
+def create_table(table_schema: str, mem_metadata):
     metadata_path = Global.get_metadata_path()
     sstable_folder = Global.get_sstable_folder()
 
     table_name = table_schema['name']
 
-    with open(metadata_path, 'r') as fp:
-        metadata: dict = json.load(fp)
-
-    if table_name in metadata.keys():
+    if table_name in mem_metadata.keys():
         raise NameError('Table Already Exists')
 
     table_filename = '{}_{}.json'.format(table_name, 1)
     os.mknod(osp.join(sstable_folder, table_filename))
 
     table_schema['filenames'] = [table_filename]
-    metadata[table_name] = table_schema
+    mem_metadata[table_name] = table_schema
 
     with open(metadata_path, 'w') as fp:
-        json.dump(metadata, fp)
+        json.dump(mem_metadata, fp)
 
 
-def delete_table(Table_name):
-    with open(Global.get_metadata_path(), 'r') as f:
-        metadata = json.load(f)
-
-    if Table_name in metadata:
-        Table_list = metadata[Table_name]['filenames']
+def delete_table(Table_name, mem_metadata):
+    if Table_name in mem_metadata:
+        Table_list = mem_metadata[Table_name]['filenames']
         for Table in Table_list:
             Table_path = osp.join(Global.get_sstable_folder(), Table)
             os.remove(Table_path)
-        metadata.pop(Table_name)
+        mem_metadata.pop(Table_name)
         with open(Global.get_metadata_path(), 'w') as f:
-            json.dump(metadata, f)
+            json.dump(mem_metadata, f)
     else:
         raise NameError("Table does not exist!")

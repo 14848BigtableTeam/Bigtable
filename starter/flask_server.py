@@ -3,7 +3,10 @@ import argparse
 import os
 import os.path as osp
 import api
+import json
 import global_v as Global
+
+global metadata
 
 app = Flask(__name__)
 
@@ -15,23 +18,27 @@ def hello_world():
 
 @app.route('/api/tables', methods=['GET'])
 def get_list_tables():
-    res = {'tables': api.list_tables()}
+    global metadata
+    res = {'tables': list(metadata.keys())}
     return res, 200
 
 
 @app.route('/api/tables/<Table_name>', methods=['GET'])
-def table_info(Table_name):
-    try:
-        res = api.get_table_info(Table_name)
-    except NameError:
+def get_table_info(Table_name):
+    global metadata
+    if Table_name in metadata:
+        table_info = metadata[Table_name]
+        res = {key: table_info[key] for key in metadata[Table_name] if key != 'filenames'}
+        return res, 200
+    else:
         return "", 404
-    return res, 200
 
 
 @app.route('/api/tables/<Table_name>', methods=['DELETE'])
 def table_delete(Table_name):
+    global metadata
     try:
-        api.delete_table(Table_name)
+        api.delete_table(Table_name, metadata)
     except NameError:
         return "", 404
     return "", 200
@@ -42,11 +49,33 @@ def post_create_table():
     table_schema = request.get_json(force=True, silent=True)
     if table_schema is None:
         return "", 400
+    global metadata
     try:
-        api.create_table(table_schema)
+        api.create_table(table_schema, metadata)
     except NameError:
         return "", 409
     return "", 200
+
+
+@app.route('/api/table/<table_name>/cell', methods=['POST'])
+def post_insert_cell(table_name):
+    global metadata
+    payload = request.get_json(force=True, silent=True)
+    if table_name not in metadata:
+        return '', 404
+    column_family_key = payload['column_family']
+    table_info = metadata[table_name]
+    column_family_info = [column_family_info for column_family_info in
+                          table_info['column_families'] if column_family_info['column_family_key'] == column_family_key]
+    if not len(column_family_info):
+        return '', 400
+    assert len(column_family_info) == 1
+    column_family_info = column_family_info[0]
+    column_key = payload['column']
+    if column_key not in column_family_info['columns']:
+        return '', 400
+
+    return '', 200
 
 
 def get_args_parser():
@@ -80,6 +109,10 @@ def main():
     if not osp.exists(metadata_path):
         with open(metadata_path, 'w+') as fp:
             fp.write('{}')
+
+    global metadata
+    with open(metadata_path, 'r') as fp:
+        metadata = json.load(fp)
 
     app.run(args.tablet_hostname, args.tablet_port)
 

@@ -1,11 +1,11 @@
-from flask import Flask, jsonify
+from flask import Flask, request
 import argparse
 import os
 import os.path as osp
 import api
+
 app = Flask(__name__)
 import global_v as Global
-
 
 
 @app.route('/')
@@ -18,6 +18,17 @@ def get_list_tables():
     res = {'tables': api.list_tables()}
     return res, 200
 
+
+@app.route('/api/tables', methods=['POST'])
+def post_create_table():
+    table_schema = request.get_json(force=True, silent=True)
+    if table_schema is None:
+        return "", 400
+    try:
+        api.create_table(table_schema)
+    except NameError:
+        return "", 409
+    return "", 200
 
 
 def get_args_parser():
@@ -49,7 +60,9 @@ def main():
         os.makedirs(SSTABLE_FOLDER)
 
     if not osp.exists(METADATA_PATH):
-        os.mknod(METADATA_PATH)
+        with open(METADATA_PATH, 'w+') as fp:
+            fp.write('{}')
+
 
     app.run(args.tablet_hostname, args.tablet_port)
 

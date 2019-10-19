@@ -7,7 +7,7 @@ global WAL_PATH
 global SSTABLE_FOLDER
 global METADATA_PATH
 
-def get_table_info(str Table_name):
+def get_table_info(Table_name):
     global METADATA_PATH
     
     with open(METADATA_PATH, 'r') as f:
@@ -44,8 +44,7 @@ def create_table(table_schema_str: str):
     with open(METADATA_PATH, 'w') as fp:
         json.dump(metadata, fp)
 
-def delete_table():
-    global METADATA_PATH
+def delete_table(Table_name):
 
     with open(METADATA_PATH, 'r') as f:
         metadata = json.load(f)

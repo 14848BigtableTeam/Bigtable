@@ -3,13 +3,10 @@ from typing import List
 import os
 import os.path as osp
 
-global WAL_PATH
-global SSTABLE_FOLDER
-global METADATA_PATH
-
+import global_v as Global
 
 def list_tables() -> List[str]:
-    with open(METADATA_PATH, 'r') as fp:
+    with open(Global.get_metadata_path(), 'r') as fp:
         metadata: dict = json.load(fp)
     return list(metadata.keys())
 

@@ -1,8 +1,11 @@
-from flask import Flask
+from flask import Flask, jsonify
 import argparse
 import os
 import os.path as osp
+import api
 app = Flask(__name__)
+import global_v as Global
+
 
 
 @app.route('/')
@@ -11,9 +14,9 @@ def hello_world():
 
 
 @app.route('/api/tables', methods=['GET'])
-def list_table():
-    pass
-
+def get_list_tables():
+    res = {'tables': api.list_tables()}
+    return res, 200
 
 
 
@@ -28,19 +31,19 @@ def get_args_parser():
     return parser
 
 
-if __name__ == '__main__':
+def main():
     parser = get_args_parser()
     args = parser.parse_args()
 
-    global WAL_PATH
-    WAL_PATH = args.WAL
-    global SSTABLE_FOLDER
+    WAL = args.WAL
     SSTABLE_FOLDER = args.sstable_folder
-    global METADATA_PATH
     METADATA_PATH = osp.join(SSTABLE_FOLDER, 'metadata.json')
+    Global.set_wal_path(WAL)
+    Global.set_sstable_folder(SSTABLE_FOLDER)
+    Global.set_metadata_path(METADATA_PATH)
 
-    if not osp.exists(WAL_PATH):
-        os.mknod(WAL_PATH)
+    if not osp.exists(WAL):
+        os.mknod(WAL)
 
     if not osp.exists(SSTABLE_FOLDER):
         os.makedirs(SSTABLE_FOLDER)
@@ -49,3 +52,7 @@ if __name__ == '__main__':
         os.mknod(METADATA_PATH)
 
     app.run(args.tablet_hostname, args.tablet_port)
+
+
+if __name__ == '__main__':
+    main()

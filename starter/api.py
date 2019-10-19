@@ -5,14 +5,17 @@ import os.path as osp
 
 import global_v as Global
 
+
 def list_tables() -> List[str]:
     with open(Global.get_metadata_path(), 'r') as fp:
         metadata: dict = json.load(fp)
     return list(metadata.keys())
 
 
-def create_table(table_schema_str: str):
-    table_schema: dict = json.loads(table_schema_str)
+def create_table(table_schema: str):
+    METADATA_PATH = Global.get_metadata_path()
+    SSTABLE_FOLDER = Global.get_sstable_folder()
+
     table_name = table_schema['name']
 
     with open(METADATA_PATH, 'r') as fp:
@@ -29,6 +32,7 @@ def create_table(table_schema_str: str):
 
     with open(METADATA_PATH, 'w') as fp:
         json.dump(metadata, fp)
+
 
 def delete_table():
     pass

@@ -23,24 +23,24 @@ def list_tables() -> List[str]:
 
 
 def create_table(table_schema: str):
-    METADATA_PATH = Global.get_metadata_path()
-    SSTABLE_FOLDER = Global.get_sstable_folder()
+    metadata_path = Global.get_metadata_path()
+    sstable_folder = Global.get_sstable_folder()
 
     table_name = table_schema['name']
 
-    with open(METADATA_PATH, 'r') as fp:
+    with open(metadata_path, 'r') as fp:
         metadata: dict = json.load(fp)
 
     if table_name in metadata.keys():
         raise NameError('Table Already Exists')
 
     table_filename = '{}_{}.json'.format(table_name, 1)
-    os.mknod(osp.join(SSTABLE_FOLDER, table_filename))
+    os.mknod(osp.join(sstable_folder, table_filename))
 
     table_schema['filenames'] = [table_filename]
     metadata[table_name] = table_schema
 
-    with open(METADATA_PATH, 'w') as fp:
+    with open(metadata_path, 'w') as fp:
         json.dump(metadata, fp)
 
 

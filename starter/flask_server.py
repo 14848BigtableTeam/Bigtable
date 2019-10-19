@@ -1,11 +1,11 @@
-from flask import Flask, jsonify, request
+from flask import Flask, request
 import argparse
 import os
 import os.path as osp
 import api
+
 app = Flask(__name__)
 import global_v as Global
-
 
 
 @app.route('/')
@@ -13,16 +13,37 @@ def hello_world():
     return 'hello world'
 
 
-@app.route('/api/tables', methods=['GET'])
+@app.route('/api/tables/', methods=['GET'])
 def get_list_tables():
     res = {'tables': api.list_tables()}
     return res, 200
 
-@app.route('./api/tables/<Table_name>', methods=['Get'])
+@app.route('/api/tables/<Table_name>', methods=['GET'])
 def table_info(Table_name):
-    data = request.get_json(force = True)
+    try: 
+        res = api.get_table_info(Table_name)
+    except NameError:
+        return "", 404
+    return res, 200
     
+@app.route('/api/tables/<Table_name>', methods=['DELETE'])
+def table_delete(Table_name):
+    try: 
+        api.delete_table(Table_name)
+    except NameError:
+        return "", 404
+    return "", 200
 
+@app.route('/api/tables', methods=['POST'])
+def post_create_table():
+    table_schema = request.get_json(force=True, silent=True)
+    if table_schema is None:
+        return "", 400
+    try:
+        api.create_table(table_schema)
+    except NameError:
+        return "", 409
+    return "", 200
 
 
 def get_args_parser():
@@ -54,7 +75,9 @@ def main():
         os.makedirs(SSTABLE_FOLDER)
 
     if not osp.exists(METADATA_PATH):
-        os.mknod(METADATA_PATH)
+        with open(METADATA_PATH, 'w+') as fp:
+            fp.write('{}')
+
 
     app.run(args.tablet_hostname, args.tablet_port)
 

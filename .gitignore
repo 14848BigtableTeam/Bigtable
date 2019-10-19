@@ -1,1 +1,4 @@
 .idea
+WAL
+SSTABLE
+__pycache__

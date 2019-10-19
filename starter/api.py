@@ -2,25 +2,23 @@ import json
 from typing import List
 import os
 import os.path as osp
+import global_v as Global
 
-global WAL_PATH
-global SSTABLE_FOLDER
-global METADATA_PATH
 
 def get_table_info(Table_name):
-    global METADATA_PATH
     
-    with open(METADATA_PATH, 'r') as f:
+    with open(Global.get_metadata_path(), 'r') as f:
         metadata = json.load(f)
     
     if Table_name in metadata:
-        return metadata[Table_name]
+        table_info = metadata[Table_name].pop('filenames')
+        return table_info
     else:
         raise NameError("Table does not exist!")
         return 
 
 def list_tables() -> List[str]:
-    with open(METADATA_PATH, 'r') as fp:
+    with open(Global.get_metadata_path(), 'r') as fp:
         metadata: dict = json.load(fp)
     return list(metadata.keys())
 
@@ -46,17 +44,17 @@ def create_table(table_schema_str: str):
 
 def delete_table(Table_name):
 
-    with open(METADATA_PATH, 'r') as f:
+    with open(Global.get_metadata_path(), 'r') as f:
         metadata = json.load(f)
 
     if Table_name in metadata:
         Table_list = metadata[Table_name][filenames]
         for Table in Table_list:
-            Table_path = os.join(SSTABLE_FOLDER, Table)
+            Table_path = os.join(Global.get_sstable_folder(), Table)
             os.remove(Table_path)
         modi_meta = metadata.pop(Table_name)
-        with open(METADATA_PATH, 'w') as f:
+        with open(Global.get_metadata_path(), 'w') as f:
             json.dump(modi_meta, f)
-    else
+    else:
         raise NameError("Table does not exist!")
     return

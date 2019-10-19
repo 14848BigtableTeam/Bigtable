@@ -1,0 +1,39 @@
+{
+  "SSTable": [
+    {
+      "row": "xxxxx",
+      "column_families": {
+        "column_family_key_1": {
+          "column_key_1": [
+            {
+              "time": "xxxxxxxx",
+              "data": "XXXXXXXX"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "MemTable": [
+    {
+      "row": "xxxxx",
+      "table_name": "XXXXXXXX",
+      "column_families": {
+        "column_family_key_1": {
+          "column_key_1": [
+            {
+              "time": "xxxxxxxx",
+              "data": "XXXXXXXX"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "SSIndex": {
+    "row": {
+      "table_name_1": "file_path",
+      "table_name_2": "file_path"
+    }
+  }
+}

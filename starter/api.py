@@ -7,6 +7,17 @@ global WAL_PATH
 global SSTABLE_FOLDER
 global METADATA_PATH
 
+def get_table_info(str Table_name):
+    global METADATA_PATH
+    
+    with open(METADATA_PATH, 'r') as f:
+        metadata = json.load(f)
+    
+    if Table_name in metadata:
+        return metadata[Table_name]
+    else:
+        raise NameError("Table does not exist!")
+        return 
 
 def list_tables() -> List[str]:
     with open(METADATA_PATH, 'r') as fp:
@@ -34,4 +45,19 @@ def create_table(table_schema_str: str):
         json.dump(metadata, fp)
 
 def delete_table():
-    pass
+    global METADATA_PATH
+
+    with open(METADATA_PATH, 'r') as f:
+        metadata = json.load(f)
+
+    if Table_name in metadata:
+        Table_list = metadata[Table_name][filenames]
+        for Table in Table_list:
+            Table_path = os.join(SSTABLE_FOLDER, Table)
+            os.remove(Table_path)
+        modi_meta = metadata.pop(Table_name)
+        with open(METADATA_PATH, 'w') as f:
+            json.dump(modi_meta, f)
+    else
+        raise NameError("Table does not exist!")
+    return

@@ -5,23 +5,6 @@ import os.path as osp
 import global_v as Global
 
 
-def get_table_info(Table_name):
-    with open(Global.get_metadata_path(), 'r') as f:
-        metadata = json.load(f)
-
-    if Table_name in metadata:
-        metadata[Table_name].pop('filenames')
-        return metadata[Table_name]
-    else:
-        raise NameError("Table does not exist!")
-
-
-def list_tables() -> List[str]:
-    with open(Global.get_metadata_path(), 'r') as fp:
-        metadata: dict = json.load(fp)
-    return list(metadata.keys())
-
-
 def create_table(table_schema: str, mem_metadata):
     metadata_path = Global.get_metadata_path()
     sstable_folder = Global.get_sstable_folder()

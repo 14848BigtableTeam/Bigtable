@@ -2,11 +2,13 @@ from flask import Flask, request
 import argparse
 import os
 import os.path as osp
-import api
+import table_api
 import json
 import global_v as Global
 
 global metadata
+global memtable
+global memindex
 
 app = Flask(__name__)
 
@@ -38,7 +40,7 @@ def get_table_info(Table_name):
 def table_delete(Table_name):
     global metadata
     try:
-        api.delete_table(Table_name, metadata)
+        table_api.delete_table(Table_name, metadata)
     except NameError:
         return "", 404
     return "", 200
@@ -51,7 +53,7 @@ def post_create_table():
         return "", 400
     global metadata
     try:
-        api.create_table(table_schema, metadata)
+        table_api.create_table(table_schema, metadata)
     except NameError:
         return "", 409
     return "", 200
@@ -96,6 +98,8 @@ def main():
     wal_path = args.wal
     sstable_folder = args.sstable_folder
     metadata_path = osp.join(sstable_folder, 'metadata.json')
+    ssindex_path = osp.join(osp.split(wal_path)[0], 'ssindex.json')
+
     Global.set_wal_path(wal_path)
     Global.set_sstable_folder(sstable_folder)
     Global.set_metadata_path(metadata_path)
@@ -108,6 +112,10 @@ def main():
 
     if not osp.exists(metadata_path):
         with open(metadata_path, 'w+') as fp:
+            fp.write('{}')
+
+    if not osp.exists(ssindex_path):
+        with open(ssindex_path, 'w+') as fp:
             fp.write('{}')
 
     global metadata

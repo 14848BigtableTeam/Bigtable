@@ -2,8 +2,8 @@ import requests, unittest, json
 from MySupport import MySupport
 
 class TableTests(unittest.TestCase):
-    HOSTNAME = "host"
-    PORT = 80
+    HOSTNAME = "localhost"
+    PORT = 10000
 
     def suite():
         suite = unittest.TestSuite()
@@ -142,3 +142,8 @@ class TableTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNotNone(response.content)
         self.assertEqual(response.json(), expected_after)
+
+
+if __name__ == '__main__':
+    runner = unittest.TextTestRunner()
+    runner.run(TableTests.suite())

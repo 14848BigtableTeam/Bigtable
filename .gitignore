@@ -2,3 +2,5 @@
 WAL
 SSTABLE
 __pycache__
+hosts.mk
+Makefile

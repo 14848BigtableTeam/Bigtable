@@ -13,26 +13,29 @@ def hello_world():
     return 'hello world'
 
 
-@app.route('/api/tables/', methods=['GET'])
+@app.route('/api/tables', methods=['GET'])
 def get_list_tables():
     res = {'tables': api.list_tables()}
     return res, 200
 
+
 @app.route('/api/tables/<Table_name>', methods=['GET'])
 def table_info(Table_name):
-    try: 
+    try:
         res = api.get_table_info(Table_name)
     except NameError:
         return "", 404
     return res, 200
-    
+
+
 @app.route('/api/tables/<Table_name>', methods=['DELETE'])
 def table_delete(Table_name):
-    try: 
+    try:
         api.delete_table(Table_name)
     except NameError:
         return "", 404
     return "", 200
+
 
 @app.route('/api/tables', methods=['POST'])
 def post_create_table():
@@ -77,7 +80,6 @@ def main():
     if not osp.exists(METADATA_PATH):
         with open(METADATA_PATH, 'w+') as fp:
             fp.write('{}')
-
 
     app.run(args.tablet_hostname, args.tablet_port)
 

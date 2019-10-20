@@ -46,9 +46,11 @@ def table_delete(Table_name):
     global memtable
     global ssindex_path
     global wal_path
-    global memindex 
+    global memindex
+    print(memindex)
     try:
         table_api.delete_table(Table_name, metadata, memindex, memtable, ssindex_path, wal_path)
+        print(memindex)
     except NameError:
         return "", 404
     return "", 200
@@ -245,11 +247,8 @@ def main():
 
     memtable = MemTable()
 
-    memindex = {}
-
-    if osp.getsize(ssindex_path):
-        with open(ssindex_path, 'r') as f:
-            memindex = json.load(f)
+    with open(ssindex_path, 'r') as f:
+        memindex = json.load(f)
 
     if osp.getsize(wal_path):
         with open(wal_path, 'r') as f:
@@ -258,7 +257,6 @@ def main():
                 table_name = walline["table_name"]
                 walline.pop("table_name")
                 memtable.insert(table_name, walline, memindex, metadata, ssindex_path, wal_path, True)
-
 
     app.run(args.tablet_hostname, args.tablet_port)
 

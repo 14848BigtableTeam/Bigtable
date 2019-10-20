@@ -26,7 +26,7 @@ def create_table(table_schema: str, mem_metadata):
         json.dump(mem_metadata, fp)
 
 
-def delete_table(Table_name, mem_metadata, memindex, memtable,ssindex_path, wal_path):
+def delete_table(Table_name, mem_metadata, memindex, memtable, ssindex_path, wal_path):
     if Table_name in mem_metadata:
         Table_list = mem_metadata[Table_name]['filenames']
         for Table in Table_list:
@@ -35,10 +35,18 @@ def delete_table(Table_name, mem_metadata, memindex, memtable,ssindex_path, wal_
         mem_metadata.pop(Table_name)
         with open(Global.get_metadata_path(), 'w') as f:
             json.dump(mem_metadata, f)
+
+        new_memindex = {}
         for row in memindex:
-            if Table_name in memindex[row]
-            memindex[row].pop(Table_name)
-        with open(ssinde_path, 'w') as f:
+            if Table_name in memindex[row]:
+                memindex[row].pop(Table_name)
+                if len(memindex[row]) != 0:
+                    new_memindex[row] = memindex[row]
+        memindex.clear()
+        for key in new_memindex:
+            memindex[key] = new_memindex[key]
+
+        with open(ssindex_path, 'w') as f:
             json.dump(memindex, f)
         wallist = []
         with open(wal_path, 'r') as f:
@@ -47,7 +55,11 @@ def delete_table(Table_name, mem_metadata, memindex, memtable,ssindex_path, wal_
                 if walrow["table_name"] != Table_name:
                     wallist.append(line)
         with open(wal_path, 'w') as f:
-            json.dump(wallist, f)
-        memtable = [row for row in memtable if row["table_name"] != Table_name]
+            for line in wallist:
+                f.write(line)
+        new_memtable = [row for row in memtable.table if row["table_name"] != Table_name]
+        memtable.table.clear()
+        for row in new_memtable:
+            memtable.table.append(row)
     else:
         raise NameError("Table does not exist!")

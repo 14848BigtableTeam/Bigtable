@@ -4,6 +4,7 @@ import os
 import os.path as osp
 import table_api
 import json
+import requests
 import global_v as Global
 from op_api import MemTable
 
@@ -236,6 +237,19 @@ def main():
     memtable = MemTable()
 
     memindex = {}
+
+    if osp.getsize(ssindex_path):
+        with open(ssindex_path, 'r') as f:
+            memindex = json.load(f)
+
+    if osp.getsize(wal_path):
+        with open(wal_path, 'r') as f:
+            for line in f:
+                walline = json.loads(line)
+                table_name = walline["table_name"]
+                walline.pop("table_name")
+                memtable.insert(table_name, walline, memindex, metadata, ssindex_path, wal_path, True)
+
 
     app.run(args.tablet_hostname, args.tablet_port)
 

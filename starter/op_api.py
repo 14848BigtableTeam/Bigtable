@@ -12,7 +12,7 @@ class MemTable:
         self.table = []
         self.cell_data_max_num = 5
 
-    def insert(self, table_name, payload, mem_index, metadata, ssindex_path, wal_path):
+    def insert(self, table_name, payload, mem_index, metadata, ssindex_path, wal_path, recover = False):
         column_family_key, column_key, row_key, cell_data = payload['column_family'], \
                                                             payload['column'], \
                                                             payload['row'], \
@@ -25,6 +25,7 @@ class MemTable:
             if len(self.table) == self.max_entries:
                 self.spill(start=0, mem_index=mem_index, ssindex_path=ssindex_path, wal_path=wal_path,
                            metadata=metadata)
+                row_insert_index = mem_find_row_index(table=self.table, row_key=row_key, table_name=table_name)
             # cannot find a specific row, insert a new one
             new_row = {
                 'row': row_key,
@@ -39,14 +40,16 @@ class MemTable:
             # insert new row to table
             self.table.insert(row_insert_index, new_row)
 
+        if not recover:
         # write change into wal
-        with open(wal_path, 'a') as fp:
-            new_wal = {'table_name': table_name}
-            new_wal.update(payload)
-            new_wal_line = '{}\n'.format(json.dumps(new_wal))
-            fp.write(new_wal_line)
+            with open(wal_path, 'a') as fp:
+                new_wal = {'table_name': table_name}
+                new_wal.update(payload)
+                new_wal_line = '{}\n'.format(json.dumps(new_wal))
+                fp.write(new_wal_line)
 
         # inject cell data
+        print(row_insert_index)
         cell_data_l = self.table[row_insert_index]['column_families'][column_family_key][column_key]
         if len(cell_data_l) == self.cell_data_max_num:
             cell_data_l.pop(0)
@@ -209,7 +212,8 @@ class MemTable:
                         with open(subtable_path, 'r') as f:
                             subtable = json.load(f)
                         for row in row_table[table_name]["Not"]:
-                            if metadata[table_name]["row_num"][-1] == 1000:
+                            if metadata[table_name]["row_num"][-1] == 3:
+                                print(subtable_path)
                                 with open(subtable_path, 'w') as f:
                                     json.dump(subtable, f)
                                 last_file = metadata[table_name]["filenames"][-1][
@@ -219,12 +223,12 @@ class MemTable:
                                 last_file.pop()
                                 filefront = '_'.join(last_file)
                                 filename = filefront + "_" + filenum + ".json"
-                                sstable_path = osp.join(Global.get_sstable_folder(), filename)
+                                subtable_path = osp.join(Global.get_sstable_folder(), filename)
                                 metadata[table_name]["filenames"].append(filename)
                                 metadata[table_name]["row_num"].append(0)
-                                with open(sstable_path, 'w+') as f:
+                                with open(subtable_path, 'w+') as f:
                                     f.write('[]')
-                                with open(sstable_path, 'r') as f:
+                                with open(subtable_path, 'r') as f:
                                     subtable = json.load(f)
                             add_row(subtable, row)
                             metadata[table_name]["row_num"][-1] += 1
@@ -291,14 +295,19 @@ def merge_row(subtable, row):
     for column_family in subtable[row_index]["column_families"]:
         for column in subtable[row_index]["column_families"][column_family]:
             subtable_list = subtable[row_index]["column_families"][column_family][column]
-            subtable_list = subtable + row["column_families"][column_family][column]
+            subtable_list = subtable_list + row["column_families"][column_family][column]
             if len(subtable_list) > 5:
                 del subtable_list[0: len(subtable_list) - 5]
+            subtable[row_index]["column_families"][column_family][column] = subtable_list
 
 
 def add_row(subtable, row):
-    row.pop("table_name")
-    subtable.append(row)
+    row_key = row["row"]
+    tmp = row
+    tmp.pop("table_name")
+    row_index = find_row_index(subtable, row_key)
+    subtable.insert(row_index, tmp)
+
 
 
 def find_row_index(table, row_key):

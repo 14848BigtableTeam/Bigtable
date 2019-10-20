@@ -7,6 +7,10 @@ import json
 import requests
 import global_v as Global
 from op_api import MemTable
+import logging
+
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 global metadata
 global memtable
@@ -47,10 +51,8 @@ def table_delete(Table_name):
     global ssindex_path
     global wal_path
     global memindex
-    print(memindex)
     try:
         table_api.delete_table(Table_name, metadata, memindex, memtable, ssindex_path, wal_path)
-        print(memindex)
     except NameError:
         return "", 404
     return "", 200

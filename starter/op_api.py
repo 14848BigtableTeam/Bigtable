@@ -202,8 +202,6 @@ class MemTable:
         c_table = self.table[start:]
         row_table = classify(c_table, mem_index)
         wal_table = wal_classify(c_table)
-        with open("./classify.json", "w") as f:
-            json.dump(row_table, f, indent=2)
         for table_name in row_table:
             for subtable_name in row_table[table_name]:
                 if subtable_name != "Not":
@@ -255,7 +253,7 @@ class MemTable:
             with open(wal_path, 'r') as f:
                 for line in f:
                     walline = json.loads(line)
-                    if walline["row"] + "_" + walline["table_name"] not in wal_table:
+                    if str(walline["row"]) + "_" + walline["table_name"] not in wal_table:
                         WALlist.append(line)
             with open(wal_path, 'w') as f:
                 for line in WALlist:
@@ -291,7 +289,7 @@ def classify(c_table, mem_index):
 def wal_classify(c_table):
     wal_table = []
     for row in c_table:
-        row_key = row["row"]
+        row_key = str (row["row"])
         table_name = row["table_name"]
         wal_table.append(row_key + "_" + table_name)
     return wal_table

@@ -129,7 +129,39 @@ def get_retrieve_row(table_name):
     if table_name not in metadata:
         return '', 404
 
-    # retrieve from memtable
+    # retrieve from memtable and sstable
+    retrieve_row_res = memtable.retrieve_row(table_name=table_name, payload=payload, metadata=metadata,
+                                             mem_index=memindex)
+    return retrieve_row_res, 200
+
+
+@app.route('/api/table/<table_name>/cells', methods=['GET'])
+def get_retrieve_cells(table_name):
+    global metadata
+    global memtable
+    global memindex
+    payload = request.get_json(force=True, silent=True)
+    # table name not exist
+    if table_name not in metadata:
+        return '', 404
+    column_family_key = payload['column_family']
+    table_info = metadata[table_name]
+    column_family_info = [column_family_info for column_family_info in
+                          table_info['column_families'] if column_family_info['column_family_key'] == column_family_key]
+    # column family not exist
+    if not len(column_family_info):
+        return '', 400
+    assert len(column_family_info) == 1
+    column_family_info = column_family_info[0]
+    column_key = payload['column']
+    # column not exist
+    if column_key not in column_family_info['columns']:
+        return '', 400
+    # retrieve from memtable and sstable
+    res = memtable.retrieve_cells(table_name=table_name, payload=payload, mem_index=memindex)
+    if res is None:
+        return '', 400
+    return res, 200
 
 
 # just for test and debug
@@ -137,6 +169,7 @@ def get_retrieve_row(table_name):
 def get_memtable():
     global memtable
     return json.dumps(memtable.table, indent=2), 200
+
 
 @app.route('/api/memtable', methods=['POST'])
 def set_memtable():
@@ -151,7 +184,7 @@ def set_memtable():
         return "", 200
     else:
         return "", 400
-        
+
 
 def get_args_parser():
     parser = argparse.ArgumentParser()

@@ -15,7 +15,8 @@ def create_table(table_schema: str, mem_metadata):
         raise NameError('Table Already Exists')
 
     table_filename = '{}_{}.json'.format(table_name, 1)
-    os.mknod(osp.join(sstable_folder, table_filename))
+    with open(osp.join(sstable_folder, table_filename), 'w+') as fp:
+        fp.write('[]')
 
     table_schema['filenames'] = [table_filename]
     table_schema['row_num'] = [0]

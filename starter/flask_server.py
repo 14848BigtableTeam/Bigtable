@@ -11,6 +11,7 @@ global metadata
 global memtable
 global memindex
 global ssindex_path
+global wal_path
 
 app = Flask(__name__)
 
@@ -67,6 +68,7 @@ def post_insert_cell(table_name):
     global memtable
     global ssindex_path
     global wal_path
+    global memindex
     # parse json input data
     payload = request.get_json(force=True, silent=True)
     # table name not exist
@@ -86,7 +88,7 @@ def post_insert_cell(table_name):
     if column_key not in column_family_info['columns']:
         return '', 400
     # can insert a cell data
-    memtable.insert(table_name, payload, metadata, ssindex_path, wal_path)
+    memtable.insert(table_name, payload, memindex, metadata, ssindex_path, wal_path)
     return '', 200
 
 
@@ -136,6 +138,20 @@ def get_memtable():
     global memtable
     return json.dumps(memtable.table, indent=2), 200
 
+@app.route('/api/memtable', methods=['POST'])
+def set_memtable():
+    global metadata
+    global memtable
+    global memindex
+    global ssindex_path
+    global wal_path
+    payload = request.get_json(force=True, silent=True)
+    if len(payload) == 1 and "memtable_max" in payload and payload["memtable_max"] > 0:
+        memtable.set_max_entries(payload, memindex, ssindex_path, wal_path, metadata)
+        return "", 200
+    else:
+        return "", 400
+        
 
 def get_args_parser():
     parser = argparse.ArgumentParser()

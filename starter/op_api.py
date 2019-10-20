@@ -12,7 +12,7 @@ class MemTable:
         self.table = []
         self.cell_data_max_num = 5
 
-    def insert(self, table_name, payload, metadata, ssindex_path, wal_path):
+    def insert(self, table_name, payload, mem_index, metadata, ssindex_path, wal_path):
         column_family_key, column_key, row_key, cell_data = payload['column_family'], \
                                                             payload['column'], \
                                                             payload['row'], \
@@ -23,7 +23,7 @@ class MemTable:
                 self.table[row_insert_index]['table_name'] != table_name:
             # size of memtable has reached to the maximum value
             if len(self.table) == self.max_entries:
-                self.spill(ssindex_path=ssindex_path, wal_path=wal_path, metadata=metadata)
+                self.spill(start = 0, mem_index=mem_index, ssindex_path=ssindex_path, wal_path=wal_path, metadata=metadata)
             # cannot find a specific row, insert a new one
             new_row = {
                 'row': row_key,
@@ -105,12 +105,12 @@ class MemTable:
 
                 
 
-    def spill(self, start, mem_index, ssindex_path, wal_path, metadata_path):
-        with open(metadata_path, 'f') as f:
-            metadata = json.load(f)
-
+    def spill(self, start, mem_index, ssindex_path, wal_path, metadata):
         c_table = self.table[start :]
-        row_table = classify(c_table)
+        row_table = classify(c_table, mem_index)
+        wal_table = wal_classify(c_table)
+        with open("./classify.json", "w") as f:
+            json.dump(row_table, f, indent=2)
         for table_name in row_table:
             for subtable_name in row_table[table_name]:
                 if subtable_name != "Not":
@@ -146,16 +146,36 @@ class MemTable:
                                     subtable = json.load(f)
                             add_row(subtable, row)
                             metadata[table_name]["row_num"][-1] += 1
-                            mem_index[row["row"]][table_name] = filename
-                        with open(sstable_path, 'r') as f:
+                            if row["row"] not in mem_index:
+                                mem_index[row["row"]] = {}
+                            mem_index[row["row"]][table_name] = metadata[table_name]["filenames"][-1]
+                        with open(subtable_path, 'w') as f:
                             json.dump(subtable, f)
         self.table = self.table[0: start]
-        with open(metadata_path, 'w') as f:
+        print(self.table)
+        with open(Global.get_metadata_path(), 'w') as f:
             json.dump(metadata, f)
         with open(ssindex_path, 'w') as f:
             json.dump(mem_index, f) 
-        with open(wal_path, 'w') as f:
-            pass
+        if start != 0:
+            WALlist = []
+            with open(wal_path, 'r') as f:
+                for line in f:
+                    walline = json.loads(line)
+                    if walline["row"] + "_" + walline["table_name"] not in wal_table:
+                        WALlist.append(line)
+            with open(wal_path, 'w') as f:
+                for line in WALlist:
+                    f.write(line)
+        else:
+            with open(wal_path, 'w') as f:
+                pass
+
+    def set_max_entries(self, payload, mem_index, ssindex_path, wal_path, metadata):
+        num = payload['memtable_max']
+        if num < self.max_entries:
+            self.spill(num, mem_index, ssindex_path, wal_path, metadata)
+        self.max_entries = num
 
 def classify (c_table, mem_index):
         row_table = {}
@@ -172,6 +192,15 @@ def classify (c_table, mem_index):
             else:
                 row_table[table_name]["Not"].append(row)
         return row_table
+
+def wal_classify(c_table):
+    wal_table = []
+    for row in c_table:
+        row_key = row["row"]
+        table_name = row["table_name"]
+        wal_table.append(row_key + "_" + table_name)
+    return wal_table
+
 
 def merge_row(subtable, row):
         row_key = row["row"]

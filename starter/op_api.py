@@ -68,9 +68,9 @@ class MemTable:
             mem_data = self.table[mem_find]["column_families"][column_family][column]
         if row in mem_index:
             if table_name in mem_index[row]:
-                with open(osp.join(Global.get_sstable_folder(), mem_index[row][table_name]), 'r') as f:
+                with open(osp.join(Global.get_sstable_folder(), mem_index[row][table_name]['filename']), 'r') as f:
                     sstable = json.load(f)
-                sstable_data = sstable[find_row_index(sstable, row)]["column_families"][column_family][column]
+                sstable_data = sstable[mem_index[row][table_name]['offset']]["column_families"][column_family][column]
         retrieve_data = sstable_data + mem_data
         if len(retrieve_data) > 5:
             del retrieve_data[0: len(retrieve_data) - 5]
@@ -87,11 +87,10 @@ class MemTable:
         # retrieve result  in sstable in disk
         # find if the row_key is in the specific sstable file
         if row_key in mem_index and table_name in mem_index[row_key]:
-            sstable_path = osp.join(Global.get_sstable_folder(), mem_index[row_key][table_name])
+            sstable_path = osp.join(Global.get_sstable_folder(), mem_index[row_key][table_name]['filename'])
             with open(sstable_path, 'r') as fp:
                 sstable = json.load(fp)
-            sstable_res = [row_res for row_res in sstable if row_res['row'] == row_key]
-            sstable_res = sstable_res[0] if len(sstable_res) else {}
+            sstable_res = sstable[mem_index[row_key][table_name]['offset']]
 
         all_res = {
             "row": row_key,
@@ -133,17 +132,7 @@ class MemTable:
         row_to_key = payload['row_to']
 
         row_from_index = mem_find_row_index(table=self.table, row_key=row_from_key, table_name=table_name)
-        is_row_from_index_valid = (
-                row_from_index < len(self.table) and self.table[row_from_index]['row'] == row_from_key)
-        row_from_sstable_path = mem_index.get(row_from_key, {}).get(table_name, None)
-        # if not is_row_from_index_valid and (row_from_sstable_path is None):
-        #     return None
-
         row_to_index = mem_find_row_index(table=self.table, row_key=row_to_key, table_name=table_name)
-        is_row_to_index_valid = (row_to_index < len(self.table) and self.table[row_to_index]['row'] == row_to_key)
-        row_to_sstable_path = mem_index.get(row_to_key, {}).get(table_name, None)
-        # if not is_row_to_index_valid and (row_to_sstable_path is None):
-        #     return None
 
         row_from_index = min(row_from_index, len(self.table) - 1)
         row_to_index = min(row_to_index, len(self.table) - 1)

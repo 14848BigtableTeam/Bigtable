@@ -158,8 +158,13 @@ def get_retrieve_cells(table_name):
     # column not exist
     if column_key not in column_family_info['columns']:
         return '', 400
+    # row_from greater than row_to
+    row_from_key = payload['row_from']
+    row_to_key = payload['row_to']
+    if row_from_key > row_to_key:
+        return '', 400
     # retrieve from memtable and sstable
-    res = memtable.retrieve_cells(table_name=table_name, payload=payload, mem_index=memindex)
+    res = memtable.retrieve_cells(table_name=table_name, payload=payload, mem_index=memindex, metadata=metadata)
     if res is None:
         return '', 400
     return res, 200

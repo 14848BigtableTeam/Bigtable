@@ -26,7 +26,7 @@ def create_table(table_schema: str, mem_metadata):
         json.dump(mem_metadata, fp)
 
 
-def delete_table(Table_name, mem_metadata):
+def delete_table(Table_name, mem_metadata, memindex, memtable,ssindex_path, wal_path):
     if Table_name in mem_metadata:
         Table_list = mem_metadata[Table_name]['filenames']
         for Table in Table_list:
@@ -35,5 +35,19 @@ def delete_table(Table_name, mem_metadata):
         mem_metadata.pop(Table_name)
         with open(Global.get_metadata_path(), 'w') as f:
             json.dump(mem_metadata, f)
+        for row in memindex:
+            if Table_name in memindex[row]
+            memindex[row].pop(Table_name)
+        with open(ssinde_path, 'w') as f:
+            json.dump(memindex, f)
+        wallist = []
+        with open(wal_path, 'r') as f:
+            for line in f:
+                walrow = json.loads(line)
+                if walrow["table_name"] != Table_name:
+                    wallist.append(line)
+        with open(wal_path, 'w') as f:
+            json.dump(wallist, f)
+        memtable = [row for row in memtable if row["table_name"] != Table_name]
     else:
         raise NameError("Table does not exist!")

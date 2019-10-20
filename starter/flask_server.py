@@ -43,8 +43,12 @@ def get_table_info(Table_name):
 @app.route('/api/tables/<Table_name>', methods=['DELETE'])
 def table_delete(Table_name):
     global metadata
+    global memtable
+    global ssindex_path
+    global wal_path
+    global memindex 
     try:
-        table_api.delete_table(Table_name, metadata)
+        table_api.delete_table(Table_name, metadata, memindex, memtable, ssindex_path, wal_path)
     except NameError:
         return "", 404
     return "", 200

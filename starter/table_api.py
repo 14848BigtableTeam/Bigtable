@@ -18,6 +18,7 @@ def create_table(table_schema: str, mem_metadata):
     os.mknod(osp.join(sstable_folder, table_filename))
 
     table_schema['filenames'] = [table_filename]
+    table_schema['row_num'] = [0]
     mem_metadata[table_name] = table_schema
 
     with open(metadata_path, 'w') as fp:

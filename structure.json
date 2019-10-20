@@ -35,5 +35,52 @@
       "table_name_1": "file_path",
       "table_name_2": "file_path"
     }
+  },
+  "metadata": {
+    "table1": {
+      "name": "table1",
+      "column_families": [
+        {
+          "column_family_key": "key1",
+          "columns": [
+            "column_key1",
+            "column_key2"
+          ]
+        },
+        {
+          "column_family_key": "key2",
+          "columns": [
+            "column_key3",
+            "column_key4"
+          ]
+        }
+      ],
+      "filenames": [
+        "table1_1.json"
+      ],
+      "row_num": [500]
+    },
+    "table2": {
+      "name": "table2",
+      "column_families": [
+        {
+          "column_family_key": "key1",
+          "columns": [
+            "column_key1",
+            "column_key2"
+          ]
+        },
+        {
+          "column_family_key": "key2",
+          "columns": [
+            "column_key3",
+            "column_key4"
+          ]
+        }
+      ],
+      "filenames": [
+        "table2_1.json"
+      ]
+    }
   }
 }

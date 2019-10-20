@@ -5,10 +5,12 @@ import os.path as osp
 import table_api
 import json
 import global_v as Global
+from op_api import MemTable
 
 global metadata
 global memtable
 global memindex
+global ssindex_path
 
 app = Flask(__name__)
 
@@ -30,7 +32,7 @@ def get_table_info(Table_name):
     global metadata
     if Table_name in metadata:
         table_info = metadata[Table_name]
-        res = {key: table_info[key] for key in metadata[Table_name] if key != 'filenames'}
+        res = {key: table_info[key] for key in metadata[Table_name] if key not in ['filenames', 'row_num']}
         return res, 200
     else:
         return "", 404
@@ -62,22 +64,77 @@ def post_create_table():
 @app.route('/api/table/<table_name>/cell', methods=['POST'])
 def post_insert_cell(table_name):
     global metadata
+    global memtable
+    global ssindex_path
+    global wal_path
+    # parse json input data
     payload = request.get_json(force=True, silent=True)
+    # table name not exist
     if table_name not in metadata:
         return '', 404
     column_family_key = payload['column_family']
     table_info = metadata[table_name]
     column_family_info = [column_family_info for column_family_info in
                           table_info['column_families'] if column_family_info['column_family_key'] == column_family_key]
+    # column family not exist
     if not len(column_family_info):
         return '', 400
     assert len(column_family_info) == 1
     column_family_info = column_family_info[0]
     column_key = payload['column']
+    # column not exist
     if column_key not in column_family_info['columns']:
         return '', 400
-
+    # can insert a cell data
+    memtable.insert(table_name, payload, metadata, ssindex_path, wal_path)
     return '', 200
+
+
+@app.route('/api/table/<table_name>/cell', methods=['GET'])
+def get_retrieve_cell(table_name):
+    global metadata
+    global memtable
+    global memindex
+    payload = request.get_json(force=True, silent=True)
+    # table name not exist
+    if table_name not in metadata:
+        return '', 404
+    column_family_key = payload['column_family']
+    table_info = metadata[table_name]
+    column_family_info = [column_family_info for column_family_info in
+                          table_info['column_families'] if column_family_info['column_family_key'] == column_family_key]
+    # column family not exist
+    if not len(column_family_info):
+        return '', 400
+    assert len(column_family_info) == 1
+    column_family_info = column_family_info[0]
+    column_key = payload['column']
+    # column not exist
+    if column_key not in column_family_info['columns']:
+        return '', 400
+    # can retrieve cell data
+    res = memtable.retrieve(table_name=table_name, payload=payload, mem_index=memindex)
+    return res, 200
+
+
+@app.route('/api/table/<table_name>/row', methods=['GET'])
+def get_retrieve_row(table_name):
+    global metadata
+    global memtable
+    global memindex
+    payload = request.get_json(force=True, silent=True)
+    # table name not exist
+    if table_name not in metadata:
+        return '', 404
+
+    # retrieve from memtable
+
+
+# just for test and debug
+@app.route('/api/memtable', methods=['GET'])
+def get_memtable():
+    global memtable
+    return json.dumps(memtable.table, indent=2), 200
 
 
 def get_args_parser():
@@ -92,6 +149,12 @@ def get_args_parser():
 
 
 def main():
+    global ssindex_path
+    global wal_path
+    global memtable
+    global metadata
+    global memindex
+
     parser = get_args_parser()
     args = parser.parse_args()
 
@@ -118,9 +181,12 @@ def main():
         with open(ssindex_path, 'w+') as fp:
             fp.write('{}')
 
-    global metadata
     with open(metadata_path, 'r') as fp:
         metadata = json.load(fp)
+
+    memtable = MemTable()
+
+    memindex = {}
 
     app.run(args.tablet_hostname, args.tablet_port)
 

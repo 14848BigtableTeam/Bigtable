@@ -52,13 +52,14 @@ class MemTable:
 
     def retrieve(self, table_name, payload, mem_index):
         row = payload["row"]
-        column_family = payload["column_families"]
+        column_family = payload["column_family"]
         column = payload["column"]
 
-        mem_find = mem_find_row_index(self.table, row)
+        mem_find = mem_find_row_index(self.table, row, table_name)
         mem_data = []
         sstable_data = []
-        if self.table[mem_find]["row"] == row and self.table[mem_find]["table_name"] == table_name:
+        if mem_find < len(self.table) and self.table[mem_find]["row"] == row and self.table[mem_find][
+            "table_name"] == table_name:
             mem_data = self.table[mem_find]["column_families"][column_family][column]
         if row in mem_index:
             if table_name in mem_index[row]:

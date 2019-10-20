@@ -1,3 +1,4 @@
+import copy
 import json
 
 import os.path as osp
@@ -12,7 +13,7 @@ class MemTable:
         self.table = []
         self.cell_data_max_num = 5
 
-    def insert(self, table_name, payload, mem_index, metadata, ssindex_path, wal_path, recover = False):
+    def insert(self, table_name, payload, mem_index, metadata, ssindex_path, wal_path, recover=False):
         column_family_key, column_key, row_key, cell_data = payload['column_family'], \
                                                             payload['column'], \
                                                             payload['row'], \
@@ -41,7 +42,7 @@ class MemTable:
             self.table.insert(row_insert_index, new_row)
 
         if not recover:
-        # write change into wal
+            # write change into wal
             with open(wal_path, 'a') as fp:
                 new_wal = {'table_name': table_name}
                 new_wal.update(payload)
@@ -49,7 +50,6 @@ class MemTable:
                 fp.write(new_wal_line)
 
         # inject cell data
-        print(row_insert_index)
         cell_data_l = self.table[row_insert_index]['column_families'][column_family_key][column_key]
         if len(cell_data_l) == self.cell_data_max_num:
             cell_data_l.pop(0)
@@ -136,14 +136,14 @@ class MemTable:
         is_row_from_index_valid = (
                 row_from_index < len(self.table) and self.table[row_from_index]['row'] == row_from_key)
         row_from_sstable_path = mem_index.get(row_from_key, {}).get(table_name, None)
-        if not is_row_from_index_valid and (row_from_sstable_path is None):
-            return None
+        # if not is_row_from_index_valid and (row_from_sstable_path is None):
+        #     return None
 
         row_to_index = mem_find_row_index(table=self.table, row_key=row_to_key, table_name=table_name)
         is_row_to_index_valid = (row_to_index < len(self.table) and self.table[row_to_index]['row'] == row_to_key)
         row_to_sstable_path = mem_index.get(row_to_key, {}).get(table_name, None)
-        if not is_row_to_index_valid and (row_to_sstable_path is None):
-            return None
+        # if not is_row_to_index_valid and (row_to_sstable_path is None):
+        #     return None
 
         row_from_index = min(row_from_index, len(self.table) - 1)
         row_to_index = min(row_to_index, len(self.table) - 1)
@@ -221,8 +221,7 @@ class MemTable:
                         with open(subtable_path, 'r') as f:
                             subtable = json.load(f)
                         for row in row_table[table_name]["Not"]:
-                            if metadata[table_name]["row_num"][-1] == 3:
-                                print(subtable_path)
+                            if metadata[table_name]["row_num"][-1] == 1000:
                                 with open(subtable_path, 'w') as f:
                                     json.dump(subtable, f)
                                 last_file = metadata[table_name]["filenames"][-1][
@@ -312,11 +311,10 @@ def merge_row(subtable, row):
 
 def add_row(subtable, row):
     row_key = row["row"]
-    tmp = row
+    tmp = copy.copy(row)
     tmp.pop("table_name")
     row_index = find_row_index(subtable, row_key)
     subtable.insert(row_index, tmp)
-
 
 
 def find_row_index(table, row_key):

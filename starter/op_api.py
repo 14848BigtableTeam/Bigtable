@@ -1,6 +1,7 @@
 import json
 
 import os.path as osp
+
 import global_v as Global
 
 
@@ -112,6 +113,36 @@ class MemTable:
     #                 f.write('[]')
     #         with open(sstable_path, 'r') as f:
     #             sstable = json.load(f)
+
+    def retrieve_row(self, table_name, payload, metadata, mem_index):
+        row_key = payload['row']
+
+        # retrieve result in memtable
+        memtable_res = [row_res for row_res in self.table if
+                        row_res['table_name'] == table_name and row_res['row'] == 'row_key']
+        memtable_res = memtable_res[0] if len(memtable_res) else {}
+        sstable_res = {}
+        # retrieve result  in sstable in disk
+        # find if the row_key is in the specific sstable file
+        if row_key in mem_index and table_name in mem_index[row_key]:
+            sstable_path = osp.join(Global.get_sstable_folder(), mem_index[row_key][table_name])
+            with open(sstable_path, 'r') as fp:
+                sstable = json.load(fp)
+            sstable_res = [row_res for row_res in sstable if row_res['row'] == row_key]
+            sstable_res = sstable_res[0] if len(sstable_res) else {}
+
+        all_res = {
+            "row": row_key,
+            "column_families": []
+        }
+
+        metadata_column_families = metadata[table_name]['column_families']
+        for metadata_column_family in metadata_column_families:
+            all_res_column_family = {metadata_column_family['column_family_key']: {'columns': []}}
+            for metadata_column in metadata_column_family['columns']:
+                all_res_column = {metadata_column: {'data': []}}
+                all_res_column_family[metadata_column_family['column_family_key']]['columns'].append(all_res_column)
+            all_res['column_families'].append(all_res_column_family)
 
 
 def find_row_index(table, row_key):

@@ -117,6 +117,19 @@ def get_retrieve_cell(table_name):
     return res, 200
 
 
+@app.route('/api/table/<table_name>/row', methods=['GET'])
+def get_retrieve_row(table_name):
+    global metadata
+    global memtable
+    global memindex
+    payload = request.get_json(force=True, silent=True)
+    # table name not exist
+    if table_name not in metadata:
+        return '', 404
+
+    # retrieve from memtable
+
+
 # just for test and debug
 @app.route('/api/memtable', methods=['GET'])
 def get_memtable():

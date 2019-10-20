@@ -158,6 +158,10 @@ def get_retrieve_cells(table_name):
     if column_key not in column_family_info['columns']:
         return '', 400
     # retrieve from memtable and sstable
+    res = memtable.retrieve_cells(table_name=table_name, payload=payload, mem_index=memindex)
+    if res is None:
+        return '', 400
+    return res, 200
 
 
 # just for test and debug

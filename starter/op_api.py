@@ -210,7 +210,7 @@ class MemTable:
                         with open(subtable_path, 'r') as f:
                             subtable = json.load(f)
                         for row in row_table[table_name][subtable_name]:
-                            merge_row(subtable, row)
+                            merge_row(subtable, row, mem_index)
                         with open(subtable_path, "w") as f:
                             json.dump(subtable, f)
                 else:
@@ -219,7 +219,13 @@ class MemTable:
                         with open(subtable_path, 'r') as f:
                             subtable = json.load(f)
                         for row in row_table[table_name]["Not"]:
+                            if row["row"] not in mem_index:
+                                mem_index[row["row"]] = {}
+                            if table_name not in mem_index[row["row"]]:
+                                mem_index[row["row"]][table_name] = {}
                             if metadata[table_name]["row_num"][-1] == 1000:
+                                for i, subtable_row in enumerate(subtable):
+                                    mem_index[subtable_row["row"]][table_name]["offset"] = i
                                 with open(subtable_path, 'w') as f:
                                     json.dump(subtable, f)
                                 last_file = metadata[table_name]["filenames"][-1][
@@ -238,9 +244,9 @@ class MemTable:
                                     subtable = json.load(f)
                             add_row(subtable, row)
                             metadata[table_name]["row_num"][-1] += 1
-                            if row["row"] not in mem_index:
-                                mem_index[row["row"]] = {}
-                            mem_index[row["row"]][table_name] = metadata[table_name]["filenames"][-1]
+                            mem_index[row["row"]][table_name]["filename"] = metadata[table_name]["filenames"][-1]
+                        for i, subtable_row in enumerate(subtable):
+                            mem_index[subtable_row["row"]][table_name]["offset"] = i
                         with open(subtable_path, 'w') as f:
                             json.dump(subtable, f)
         self.table = self.table[0: start]
@@ -278,9 +284,9 @@ def classify(c_table, mem_index):
         if table_name not in row_table:
             row_table[table_name] = {"Not": []}
         if row_key in mem_index and table_name in mem_index[row_key]:
-            if mem_index[row_key][table_name] not in row_table[table_name]:
-                row_table[table_name][mem_index[row_key][table_name]] = []
-            row_table[table_name][mem_index[row_key][table_name]].append(row)
+            if mem_index[row_key][table_name]["filename"] not in row_table[table_name]:
+                row_table[table_name][mem_index[row_key][table_name]["filename"]] = []
+            row_table[table_name][mem_index[row_key][table_name]["filename"]].append(row)
         else:
             row_table[table_name]["Not"].append(row)
     return row_table
@@ -295,9 +301,10 @@ def wal_classify(c_table):
     return wal_table
 
 
-def merge_row(subtable, row):
+def merge_row(subtable, row, mem_index):
     row_key = row["row"]
-    row_index = find_row_index(subtable, row_key)
+    table_name = row["table_name"]
+    row_index = mem_index[row_key][table_name]["offset"]
     for column_family in subtable[row_index]["column_families"]:
         for column in subtable[row_index]["column_families"][column_family]:
             subtable_list = subtable[row_index]["column_families"][column_family][column]

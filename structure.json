@@ -32,8 +32,10 @@
   ],
   "SSIndex": {
     "row": {
-      "table_name_1": "file_path",
-      "table_name_2": "file_path"
+      "table_name_1":{
+        "filename": "filename",
+        "offset": "offset"
+      } 
     }
   },
   "metadata": {

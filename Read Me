@@ -1,0 +1,14 @@
+The floder "env" is the virtual environment which includes all the python libraries used in this project.
+The floder "starter" contains our source code.
+The file "structure.json" is the example of the data we designed for this project
+The file "WAL_example" is the example of the WAL
+
+To run the server, please follow these steps:
+1. cd starter
+2. make tablet1
+ (The arguments of tablet1 are in the file "hosts.mk")
+
+To run the grading, please follow these steps:
+1. cd starter/grading
+2. python3 grading.py 1 <hostname> <port> 
+(for the checkpoint 1)

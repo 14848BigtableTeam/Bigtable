@@ -141,6 +141,7 @@ def post_sharding(host, port, table_name, midle_row):
          "row_to": row_to})
         url = master_api.com_url(tablet[sharding_tablet]["host"], str(tablet[sharding_tablet]["port"], 'api/sharding/' + table_name)
         requests.post(url, json = index)
+    return "", 400
     
 
 

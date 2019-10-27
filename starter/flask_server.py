@@ -219,6 +219,7 @@ def post_sharding(table_name):
     metadata[table_name] = {"name": table_name ,"column_families": data["column_families"],"row_num": [0], "total_row": 0}
     with open(Global.get_metadata_path(), 'w') as fp:
         json.dump(metadata, fp)
+    return "", 400
     
     
 

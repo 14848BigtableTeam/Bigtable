@@ -19,6 +19,7 @@ global memtable
 global memindex
 global ssindex_path
 global wal_path
+global sstable_floder
 
 app = Flask(__name__)
 
@@ -201,6 +202,26 @@ def set_memtable():
     else:
         return "", 400
 
+@app.route('/api/sharding/<table_name>', methods=['POST'])
+def post_sharding(table_name):
+    global memindex
+    global ssindex_path
+    global metadata
+    data = request.get_json(force=True, silent=True)
+    for row in data['index']:
+        if row in memindex:
+            memindex[row][table_name] = data['index'][row][table_name]
+        else:
+            memindex[row] = data['index'][row]
+    table_filename = table_name + "_1" + '.json'
+    with open(Global.get_sstable_folder(), 'w+') as fp:
+        fp.write('[]')
+    metadata[table_name] = {"name": table_name ,"column_families": data["column_families"],"row_num": [0], "total_row": 0}
+    with open(Global.get_metadata_path(), 'w') as fp:
+        json.dump(metadata, fp)
+    
+    
+
 
 def get_args_parser():
     parser = argparse.ArgumentParser()
@@ -225,6 +246,7 @@ def main():
     global memtable
     global metadata
     global memindex
+    global sstable_floder
 
     parser = get_args_parser()
     args = parser.parse_args()

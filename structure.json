@@ -60,7 +60,8 @@
       "filenames": [
         "table1_1.json"
       ],
-      "row_num": [500]
+      "row_num": [500],
+      "total_row":
     },
     "table2": {
       "name": "table2",

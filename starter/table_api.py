@@ -20,6 +20,7 @@ def create_table(table_schema: str, mem_metadata):
 
     table_schema['filenames'] = [table_filename]
     table_schema['row_num'] = [0]
+    table_schema['total_row'] = 0
     mem_metadata[table_name] = table_schema
 
     with open(metadata_path, 'w') as fp:

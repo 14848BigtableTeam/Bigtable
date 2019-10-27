@@ -7,10 +7,10 @@ import json
 import requests
 import global_v as Global
 from op_api import MemTable
-import logging
-
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+# import logging
+#
+# log = logging.getLogger('werkzeug')
+# log.setLevel(logging.ERROR)
 
 global metadata
 global memtable

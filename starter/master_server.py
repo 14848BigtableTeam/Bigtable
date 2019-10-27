@@ -57,7 +57,7 @@ def get_list_table():
     return {'tables': list(metadata.keys())}, 200
 
 
-@app.route('/api/tables/<Table_name>', methods=['GET'])
+@app.route('/api/tables/<Table_name>/', methods=['GET'])
 def get_table_info(Table_name):
     global metadata
     if Table_name not in metadata:
@@ -65,9 +65,10 @@ def get_table_info(Table_name):
     return metadata[Table_name], 200
 
 
-@app.route('/api/table/<Table_name>', methods=['DELETE'])
+@app.route('/api/tables/<Table_name>', methods=['DELETE'])
 def destroy_table_info(Table_name):
     global metadata
+    global metadata_path
     global locks
     # Table not exist
     if Table_name not in metadata:
@@ -76,10 +77,12 @@ def destroy_table_info(Table_name):
     if len(locks.get(Table_name, set())):
         return '', 409
     # Destroy tables in all tablets
-    for tablet in metadata[Table_name]:
+    for tablet in metadata[Table_name]['tablets']:
         delete_url = master_api.com_url(tablet['hostname'], tablet['port'], '/api/tables/{}'.format(Table_name))
         requests.delete(delete_url)
     metadata.pop(Table_name)
+    with open(metadata_path, 'w') as fp:
+        json.dump(metadata, fp)
     return '', 200
 
 
@@ -110,7 +113,7 @@ def post_create_table():
     metadata[table_schema["name"]] = {"name": table_schema["name"], "tablets": [{ "hostname": tablet[tablet_name]["host"], "port": str(tablet[tablet_name]["port"]), "row_from": "", "row_to": ""}]}
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f)
-    return "", 400
+    return "", 200
 
 @app.route('/api/sharding/<host>/<port>/<table_name>/<midle_row>', methods=['POST'])
 def post_sharding(host, port, table_name, midle_row):

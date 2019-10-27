@@ -7,10 +7,12 @@ import json
 import requests
 import global_v as Global
 from op_api import MemTable
+
 # import logging
 #
 # log = logging.getLogger('werkzeug')
 # log.setLevel(logging.ERROR)
+
 
 global metadata
 global memtable
@@ -211,6 +213,12 @@ def get_args_parser():
     return parser
 
 
+def com_url(hostname, port, path):
+    portstr = str(port)
+    url = f"http://{hostname}:{portstr}{path}"
+    return url
+
+
 def main():
     global ssindex_path
     global wal_path
@@ -222,6 +230,10 @@ def main():
     args = parser.parse_args()
 
     wal_path = args.wal
+    master_hostname = args.master_hostname
+    master_port = args.master_port
+    tablet_hostname = args.tablet_hostname
+    tablet_port = args.tablet_port
     sstable_folder = args.sstable_folder
     metadata_path = osp.join(sstable_folder, 'metadata.json')
     ssindex_path = osp.join(osp.split(wal_path)[0], 'ssindex.json')
@@ -259,6 +271,10 @@ def main():
                 table_name = walline["table_name"]
                 walline.pop("table_name")
                 memtable.insert(table_name, walline, memindex, metadata, ssindex_path, wal_path, True)
+
+    url = com_url(master_hostname, master_port, '/api/tablet')
+    host_port = {"host": tablet_hostname, "port": tablet_port}
+    requests.post(url, json=host_port)
 
     app.run(args.tablet_hostname, args.tablet_port)
 

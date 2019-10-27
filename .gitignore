@@ -7,4 +7,5 @@ Makefile
 WAL.json
 grading
 test
+.vscode
 env

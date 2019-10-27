@@ -202,6 +202,27 @@ def set_memtable():
         return "", 400
 
 
+@app.route('/api/sharding/<table_name>', methods=['POST'])
+def post_sharding(table_name):
+    global memindex
+    global ssindex_path
+    global metadata
+    data = request.get_json(force=True, silent=True)
+    for row in data['index']:
+        if row in memindex:
+            memindex[row][table_name] = data['index'][row][table_name]
+        else:
+            memindex[row] = data['index'][row]
+    table_filename = table_name + "_1" + '.json'
+    with open(Global.get_sstable_folder(), 'w+') as fp:
+        fp.write('[]')
+    metadata[table_name] = {"name": table_name, "column_families": data["column_families"], "row_num": [0],
+                            "row_keys": data['row_keys']}
+    with open(Global.get_metadata_path(), 'w') as fp:
+        json.dump(metadata, fp)
+    return "", 400
+
+
 def get_args_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('tablet_hostname', type=str, help='tablet hostname address')

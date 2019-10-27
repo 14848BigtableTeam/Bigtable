@@ -28,7 +28,7 @@ def open_table(Table_name):
     if client_id not in locks.get(Table_name, set()):
         if Table_name not in locks:
             locks[Table_name] = set()
-        locks[Table_name].add(client_id);
+        locks[Table_name].add(client_id)
         return '', 200
     # Table already opened
     else:
@@ -120,16 +120,31 @@ def post_sharding(host, port, table_name, midle_row):
     global tablet
     global tablet_reverse
     index = request.get_json(force=True, silent=True)
-    row_from = ''
     row_to = ''
-    # tablet_name = tablet_reverse[]
+    tablet_name = tablet_reverse[host + "_" + str(port)]
+    tablet_number = int(table_name[-1:])
+    tablet_list = []
     if index is None:
         return "", 400
 
-    # for tablet in metadata[table_name]["tablets"]:
-    #      if tablet["hostname"] + "_" + tablet["port"] == host + "_" + str(post):
-    #          row_from = tablet["row_from"]
-    #          row_to = tablet["row_to"]
+    for tablet in metadata[table_name]["tablets"]:
+        if tablet["hostname"] + "_" + tablet["port"] == host + "_" + str(port):
+            row_to = tablet["row_to"]
+            tablet["row_to"] = midle_row
+        tablet_list.append(tablet_reverse[tablet["hostname"] + "_" + tablet["port"]])
+
+    for i in range(len(tablet)):
+        sharding_tablet_number = (tablet_number + i) % len(tablet) + 1
+        sharding_tablet = "tablet" + str(sharding_tablet_number)
+        if sharding_tablet not in tablet_list:
+            metadata[tablet_name]["tablet"].append(
+                {"hostname": tablet[sharding_tablet]["host"], "port": str(tablet[sharding_tablet]["port"]),
+                 "row_from": midle_row,
+                 "row_to": row_to})
+        url = master_api.com_url(tablet[sharding_tablet]["host"],
+                                 str(tablet[sharding_tablet]["port"], 'api/sharding/' + table_name))
+        requests.post(url, json=index)
+    return "", 400
 
 
 @app.route('/api/tablet', methods=['POST'])

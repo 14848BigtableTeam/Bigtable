@@ -1,6 +1,6 @@
 import copy
 import json
-
+import requests
 import os.path as osp
 
 import global_v as Global
@@ -55,6 +55,37 @@ class MemTable:
             cell_data_l.pop(0)
         cell_data_l += cell_data
 
+        if row_key not in metadata[table_name]['row_keys']:
+            metadata[table_name]['row_keys'].append(row_key)
+            with open(Global.get_metadata_path(), 'w') as fp:
+                json.dump(metadata, fp)
+
+        if len(metadata[table_name]['row_keys']) == 1000:
+            self.spill(start=0, mem_index=mem_index, ssindex_path=ssindex_path, wal_path=wal_path, metadata=metadata)
+            keys_before_sharding = metadata[table_name]['row_keys']
+            keys_before_sharding.sort()
+
+            keys_go = keys_before_sharding[500:]
+
+            mem_index_sent = {}
+
+            for key_go in keys_go:
+                if table_name in mem_index[key_go]:
+                    if key_go not in mem_index_sent:
+                        mem_index_sent[key_go] = {}
+                    mem_index_sent[key_go][table_name] = mem_index[key_go][table_name]
+                    mem_index[key_go].pop(table_name)
+                    if len(mem_index[key_go]) == 0:
+                        mem_index.pop(key_go)
+
+            schema_sent = metadata[table_name]['column_families']
+
+            res = {'index': mem_index_sent, 'column_families': schema_sent, 'row_keys': keys_go}
+
+            post_url = 'http://{}:{}/api/sharding/{}/{}/{}/{}'.format(Global.get_tablet_hostname(),
+                                                                      Global.get_tablet_port(), table_name, key_go[0])
+            requests.post(url=post_url, json=res)
+
     def retrieve(self, table_name, payload, mem_index):
         row = payload["row"]
         column_family = payload["column_family"]
@@ -87,7 +118,7 @@ class MemTable:
         # retrieve result  in sstable in disk
         # find if the row_key is in the specific sstable file
         if row_key in mem_index and table_name in mem_index[row_key]:
-            sstable_path = osp.join(Global.get_sstable_folder(), mem_index[row_key][table_name]['filename'])
+            sstable_path = mem_index[row_key][table_name]['filename']
             with open(sstable_path, 'r') as fp:
                 sstable = json.load(fp)
             sstable_res = sstable[mem_index[row_key][table_name]['offset']]
@@ -233,7 +264,9 @@ class MemTable:
                                     subtable = json.load(f)
                             add_row(subtable, row)
                             metadata[table_name]["row_num"][-1] += 1
-                            mem_index[row["row"]][table_name]["filename"] = metadata[table_name]["filenames"][-1]
+                            mem_index[row["row"]][table_name]["filename"] = osp.join(Global.get_sstable_folder(),
+                                                                                     metadata[table_name]["filenames"][
+                                                                                         -1])
                         for i, subtable_row in enumerate(subtable):
                             mem_index[subtable_row["row"]][table_name]["offset"] = i
                         with open(subtable_path, 'w') as f:
@@ -284,7 +317,7 @@ def classify(c_table, mem_index):
 def wal_classify(c_table):
     wal_table = []
     for row in c_table:
-        row_key = str (row["row"])
+        row_key = str(row["row"])
         table_name = row["table_name"]
         wal_table.append(row_key + "_" + table_name)
     return wal_table

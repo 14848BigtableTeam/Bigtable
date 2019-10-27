@@ -241,6 +241,10 @@ def main():
     Global.set_wal_path(wal_path)
     Global.set_sstable_folder(sstable_folder)
     Global.set_metadata_path(metadata_path)
+    Global.set_master_hostname(master_hostname)
+    Global.set_master_port(master_port)
+    Global.set_tablet_hostname(tablet_hostname)
+    Global.set_tablet_port(tablet_port)
 
     if not osp.exists(wal_path):
         os.mknod(wal_path)

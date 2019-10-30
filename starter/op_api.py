@@ -13,7 +13,8 @@ class MemTable:
         self.table = []
         self.cell_data_max_num = 5
 
-    def insert(self, table_name, payload, mem_index, metadata, ssindex_path, wal_path, recover=False):
+    def insert(self, table_name, payload, mem_index, metadata, ssindex_path, wal_path, recover=False,
+               tablet_recover=False):
         column_family_key, column_key, row_key, cell_data = payload['column_family'], \
                                                             payload['column'], \
                                                             payload['row'], \
@@ -60,7 +61,7 @@ class MemTable:
             with open(Global.get_metadata_path(), 'w') as fp:
                 json.dump(metadata, fp)
 
-        if len(metadata[table_name]['row_keys']) == 1000:
+        if len(metadata[table_name]['row_keys']) == 1000 and (not tablet_recover):
             self.spill(start=0, mem_index=mem_index, ssindex_path=ssindex_path, wal_path=wal_path, metadata=metadata)
             keys_before_sharding = metadata[table_name]['row_keys']
             keys_before_sharding.sort()

@@ -13,8 +13,11 @@ import time
 
 global metadata
 global metadata_path
+
 global tablets
 global tablets_reverse
+global wal_list
+global ssindex_list
 
 app = Flask(__name__)
 
@@ -159,6 +162,8 @@ def create_tablet():
     tablet_num = len(tablets)
     tablets["tablet" + str(tablet_num + 1)] = {"host": host_port["host"], "port": host_port["port"]}
     tablets_reverse[host_port["host"] + "_" + str(host_port["port"])] = "tablet" + str(tablet_num + 1)
+    wal_list["tablet" + str(tablet_num + 1)] = host_port["wal"]
+    ssindex_list["tablet" + str(tablet_num + 1)] = host_port["ssindex"]
     return '', 200
 
 
@@ -167,9 +172,10 @@ def check_connected():
     while (True):
         for tablet_name, host_port in tablets.items():
             connect_url = 'http://{}:{}/api/connect'.format(host_port['host'], host_port['port']);
-            connect_resp = requests.get(connect_url)
-            if connect_resp.status_code == 200:
-                print(tablet_name)
+            try:
+                connect_resp = requests.get(connect_url)
+            except requests.exceptions.ConnectionError as e:
+                pass
         time.sleep(10)
 
 
@@ -185,6 +191,8 @@ if __name__ == '__main__':
     locks = dict()
     tablets = {}
     tablets_reverse = {}
+    ssindex_list = {}
+    wal_list = {}
 
     metadata_path = osp.join(osp.split(__file__)[0], "metadata.json")
     if not osp.exists(metadata_path):

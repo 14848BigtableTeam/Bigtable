@@ -1,3 +1,4 @@
+import copy
 import threading
 
 from flask import Flask, request
@@ -170,11 +171,25 @@ def create_tablet():
 def check_connected():
     global tablets
     while (True):
-        for tablet_name, host_port in tablets.items():
+        tablets_copy = copy.copy(tablets)
+        for tablet_name, host_port in tablets_copy.items():
             connect_url = 'http://{}:{}/api/connect'.format(host_port['host'], host_port['port']);
             try:
                 connect_resp = requests.get(connect_url)
+                if connect_resp.status_code == 200:
             except requests.exceptions.ConnectionError as e:
+                tablets.pop(tablet_name)
+                for recovery_tablet_name in tablets:
+                    recovery_tablet_host_port = tablets[recovery_tablet_name]
+                    recovery_url = 'http://{}:{}/api/connect'.format(recovery_tablet_host_port['host'],
+                                                                     recovery_tablet_host_port['port'])
+                    recovery_payload = {
+                        'ssindex': ssindex_list[recovery_tablet_name],
+                        'wal': wal_list[recovery_tablet_name]
+                    }
+
+                    requests.get(recovery_url, json = recovery_payload)
+                    break
                 pass
         time.sleep(10)
 

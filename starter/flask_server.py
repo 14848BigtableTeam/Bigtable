@@ -234,10 +234,11 @@ def post_sharding(table_name):
 def connect_tablet():
     return "", 200
 
-@app.route('/api/recovery/<ssindex>/<wal>', methods=['POST'])
+@app.route('/api/recovery', methods=['POST'])
 def tablet_recovery():
-    
-    with open(ssindex, 'r') as f:
+
+    data = request.get_json(force=True, silent=True)
+    with open(data["ssindex"], 'r') as f:
         recovery_ssindex = json.load(f)
     for row in recovery_ssindex:
         if row in memindex:
@@ -245,7 +246,7 @@ def tablet_recovery():
                 memindex[row][table] = recovery_ssindex[row][table]
         else:
             memindex[row] = recovery_ssindex[row]
-    with open(wal, 'r') as f:
+    with open(data["wal"], 'r') as f:
         for line in f:
             walline = json.loads(line)
             table_name = walline["table_name"]

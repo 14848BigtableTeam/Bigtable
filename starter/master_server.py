@@ -163,6 +163,10 @@ def create_tablet():
     return '', 200
 
 
+def check_connected(tablet_l):
+    pass
+
+
 if __name__ == '__main__':
     global locks
     global tablet

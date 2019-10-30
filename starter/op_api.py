@@ -236,7 +236,7 @@ class MemTable:
             for subtable_name in row_table[table_name]:
                 if subtable_name != "Not":
                     if len(row_table[table_name][subtable_name]):
-                        subtable_path = osp.join(Global.get_sstable_folder(), subtable_name)
+                        subtable_path = osp.join(subtable_name)
                         with open(subtable_path, 'r') as f:
                             subtable = json.load(f)
                         for row in row_table[table_name][subtable_name]:

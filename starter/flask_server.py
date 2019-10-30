@@ -330,7 +330,9 @@ def main():
                 memtable.insert(table_name, walline, memindex, metadata, ssindex_path, wal_path, recover = True)
 
     url = com_url(master_hostname, master_port, '/api/tablet')
-    host_port = {"host": tablet_hostname, "port": tablet_port}
+    send_wal = osp.abspath(wal_path)
+    send_ssindex = osp.abspath(ssindex_path)
+    host_port = {"host": tablet_hostname, "port": tablet_port, "wal": send_wal, "ssindex": send_ssindex}
     requests.post(url, json=host_port)
 
     app.run(args.tablet_hostname, args.tablet_port)

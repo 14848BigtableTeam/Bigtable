@@ -176,7 +176,6 @@ def check_connected():
             connect_url = 'http://{}:{}/api/connect'.format(host_port['host'], host_port['port']);
             try:
                 connect_resp = requests.get(connect_url)
-                if connect_resp.status_code == 200:
             except requests.exceptions.ConnectionError as e:
                 tablets.pop(tablet_name)
                 for recovery_tablet_name in tablets:
@@ -188,7 +187,7 @@ def check_connected():
                         'wal': wal_list[recovery_tablet_name]
                     }
 
-                    requests.get(recovery_url, json = recovery_payload)
+                    requests.get(recovery_url, json=recovery_payload)
                     break
                 pass
         time.sleep(10)

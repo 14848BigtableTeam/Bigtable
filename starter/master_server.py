@@ -1,3 +1,5 @@
+import threading
+
 from flask import Flask, request
 import argparse
 import os
@@ -7,11 +9,12 @@ import requests
 global locks
 import master_api
 import json
+import time
 
 global metadata
 global metadata_path
-global tablet
-global tablet_reverse
+global tablets
+global tablets_reverse
 
 app = Flask(__name__)
 
@@ -103,10 +106,10 @@ def post_create_table():
         return "", 400
     if table_schema["name"] in metadata:
         return "", 409
-    tablet_name = "tablet" + str(len(metadata) % len(tablet) + 1)
-    master_api.create_table(tablet[tablet_name]["host"], tablet[tablet_name]["port"], table_schema)
+    tablet_name = "tablet" + str(len(metadata) % len(tablets) + 1)
+    master_api.create_table(tablets[tablet_name]["host"], tablets[tablet_name]["port"], table_schema)
     metadata[table_schema["name"]] = {"name": table_schema["name"], "tablets": [
-        {"hostname": tablet[tablet_name]["host"], "port": str(tablet[tablet_name]["port"]), "row_from": "",
+        {"hostname": tablets[tablet_name]["host"], "port": str(tablets[tablet_name]["port"]), "row_from": "",
          "row_to": ""}]}
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f)
@@ -117,11 +120,11 @@ def post_create_table():
 def post_sharding(host, port, table_name, midle_row):
     global metadata
     global metadata_path
-    global tablet
-    global tablet_reverse
+    global tablets
+    global tablets_reverse
     index = request.get_json(force=True, silent=True)
     row_to = ''
-    tablet_name = tablet_reverse[host + "_" + str(port)]
+    tablet_name = tablets_reverse[host + "_" + str(port)]
     tablet_number = int(tablet_name[-1:])
     tablet_list = []
     if index is None:
@@ -131,18 +134,18 @@ def post_sharding(host, port, table_name, midle_row):
         if one_tablet["hostname"] + "_" + one_tablet["port"] == host + "_" + str(port):
             row_to = one_tablet["row_to"]
             one_tablet["row_to"] = midle_row
-        tablet_list.append(tablet_reverse[one_tablet["hostname"] + "_" + one_tablet["port"]])
+        tablet_list.append(tablets_reverse[one_tablet["hostname"] + "_" + one_tablet["port"]])
 
-    for i in range(len(tablet)):
-        sharding_tablet_number = (tablet_number + i) % len(tablet) + 1
+    for i in range(len(tablets)):
+        sharding_tablet_number = (tablet_number + i) % len(tablets) + 1
         sharding_tablet = "tablet" + str(sharding_tablet_number)
         if sharding_tablet not in tablet_list:
             metadata[table_name]["tablets"].append(
-                {"hostname": tablet[sharding_tablet]["host"], "port": str(tablet[sharding_tablet]["port"]),
+                {"hostname": tablets[sharding_tablet]["host"], "port": str(tablets[sharding_tablet]["port"]),
                  "row_from": midle_row,
                  "row_to": row_to})
-            url = master_api.com_url(tablet[sharding_tablet]["host"],
-                                 tablet[sharding_tablet]["port"], '/api/sharding/' + table_name)
+            url = master_api.com_url(tablets[sharding_tablet]["host"],
+                                     tablets[sharding_tablet]["port"], '/api/sharding/' + table_name)
             requests.post(url, json=index)
             break
     return "", 200
@@ -150,31 +153,38 @@ def post_sharding(host, port, table_name, midle_row):
 
 @app.route('/api/tablet', methods=['POST'])
 def create_tablet():
-    global tablet
-    global tablet_reverse
+    global tablets
+    global tablets_reverse
     host_port = request.get_json(force=True, silent=True)
-    tablet_num = len(tablet)
-    tablet["tablet" + str(tablet_num + 1)] = {"host": host_port["host"], "port": host_port["port"]}
-    tablet_reverse[host_port["host"] + "_" + str(host_port["port"])] = "tablet" + str(tablet_num + 1)
+    tablet_num = len(tablets)
+    tablets["tablet" + str(tablet_num + 1)] = {"host": host_port["host"], "port": host_port["port"]}
+    tablets_reverse[host_port["host"] + "_" + str(host_port["port"])] = "tablet" + str(tablet_num + 1)
     return '', 200
 
 
-def check_connected(tablet_l):
-    pass
+def check_connected():
+    global tablets
+    while (True):
+        for tablet_name, host_port in tablets.items():
+            connect_url = 'http://{}:{}/api/connect'.format(host_port['host'], host_port['port']);
+            connect_resp = requests.get(connect_url)
+            if connect_resp.status_code == 200:
+                print(tablet_name)
+        time.sleep(10)
 
 
 if __name__ == '__main__':
     global locks
-    global tablet
+    global tablets
     global metadata
     global metadata_path
-    global tablet_reverse
+    global tablets_reverse
     parser = get_args_parser()
     args = parser.parse_args()
 
     locks = dict()
-    tablet = {}
-    tablet_reverse = {}
+    tablets = {}
+    tablets_reverse = {}
 
     metadata_path = osp.join(osp.split(__file__)[0], "metadata.json")
     if not osp.exists(metadata_path):
@@ -183,5 +193,8 @@ if __name__ == '__main__':
 
     with open(metadata_path, 'r') as fp:
         metadata = json.load(fp)
+
+    check_conn_thread = threading.Thread(target=check_connected, name='ConnectCheck')
+    check_conn_thread.start()
 
     app.run(args.master_hostname, args.master_port)

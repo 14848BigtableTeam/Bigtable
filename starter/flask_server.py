@@ -237,7 +237,7 @@ def connect_tablet():
 
 
 @app.route('/api/recovery/<ssindex>/<wal>', methods=['POST'])
-def tablet_recovery():
+def tablet_recovery(ssindex, wal):
     with open(ssindex, 'r') as f:
         recovery_ssindex = json.load(f)
     for row in recovery_ssindex:

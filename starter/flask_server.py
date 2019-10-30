@@ -219,11 +219,6 @@ def post_sharding(table_name):
             memindex[row][table_name] = index[row][table_name]
         else:
             memindex[row] = index[row]
-    # if data["type"] == "int":
-    #     tempindex = {}
-    #     for row in memindex:
-    #         tempindex[int(row)] = memindex[row]
-    #     memindex = tempindex
     table_filename = table_name + "_1" + '.json'
     with open(osp.join(Global.get_sstable_folder(), table_filename), 'w+') as fp:
         fp.write('[]')
@@ -234,6 +229,30 @@ def post_sharding(table_name):
     with open(ssindex_path, 'w') as fp:
         json.dump(memindex, fp)
     return "", 200
+
+@app.route('/api/connect', methods=['GET'])
+def connect_tablet():
+    return "", 200
+
+@app.route('/api/recovery/<ssindex>/<wal>', methods=['POST'])
+def tablet_recovery():
+    
+    with open(ssindex, 'r') as f:
+        recovery_ssindex = json.load(f)
+    for row in recovery_ssindex:
+        if row in memindex:
+            for table in recovery_ssindex[row]:
+                memindex[row][table] = recovery_ssindex[row][table]
+        else:
+            memindex[row] = recovery_ssindex[row]
+    with open(wal, 'r') as f:
+        for line in f:
+            walline = json.loads(line)
+            table_name = walline["table_name"]
+            walline.pop("table_name")
+            memtable.insert(table_name, walline, memindex, metadata, ssindex_path, wal_path, recover = True, tablet_recover = True)
+
+    
 
 
 def get_args_parser():
@@ -308,7 +327,7 @@ def main():
                 walline = json.loads(line)
                 table_name = walline["table_name"]
                 walline.pop("table_name")
-                memtable.insert(table_name, walline, memindex, metadata, ssindex_path, wal_path, True)
+                memtable.insert(table_name, walline, memindex, metadata, ssindex_path, wal_path, recover = True)
 
     url = com_url(master_hostname, master_port, '/api/tablet')
     host_port = {"host": tablet_hostname, "port": tablet_port}

@@ -12,6 +12,8 @@ global metadata
 global metadata_path
 global tablet
 global tablet_reverse
+global wal_list
+global ssindex_list
 
 app = Flask(__name__)
 
@@ -156,6 +158,8 @@ def create_tablet():
     tablet_num = len(tablet)
     tablet["tablet" + str(tablet_num + 1)] = {"host": host_port["host"], "port": host_port["port"]}
     tablet_reverse[host_port["host"] + "_" + str(host_port["port"])] = "tablet" + str(tablet_num + 1)
+    wal_list["tablet" + str(tablet_num + 1)] = host_port["wal"]
+    ssindex_list["tablet" + str(tablet_num + 1)] = host_port["ssindex"]
     return '', 200
 
 
@@ -171,6 +175,8 @@ if __name__ == '__main__':
     locks = dict()
     tablet = {}
     tablet_reverse = {}
+    ssindex_list = {}
+    wal_list = {}
 
     metadata_path = osp.join(osp.split(__file__)[0], "metadata.json")
     if not osp.exists(metadata_path):

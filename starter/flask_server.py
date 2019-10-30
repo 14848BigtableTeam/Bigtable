@@ -40,7 +40,7 @@ def get_table_info(Table_name):
     global metadata
     if Table_name in metadata:
         table_info = metadata[Table_name]
-        res = {key: table_info[key] for key in metadata[Table_name] if key not in ['filenames', 'row_num']}
+        res = {key: table_info[key] for key in metadata[Table_name] if key not in ['filenames', 'row_num', 'row_keys']}
         return res, 200
     else:
         return "", 404
@@ -208,19 +208,32 @@ def post_sharding(table_name):
     global ssindex_path
     global metadata
     data = request.get_json(force=True, silent=True)
-    for row in data['index']:
-        if row in memindex:
-            memindex[row][table_name] = data['index'][row][table_name]
+    index = {}
+    for row in data["index"]:
+        if data["types"][row] == "int":
+            index[int(row)] = data["index"][row]
         else:
-            memindex[row] = data['index'][row]
+            index[row] = data["index"][row]
+    for row in index:
+        if row in memindex:
+            memindex[row][table_name] = index[row][table_name]
+        else:
+            memindex[row] = index[row]
+    # if data["type"] == "int":
+    #     tempindex = {}
+    #     for row in memindex:
+    #         tempindex[int(row)] = memindex[row]
+    #     memindex = tempindex
     table_filename = table_name + "_1" + '.json'
-    with open(Global.get_sstable_folder(), 'w+') as fp:
+    with open(osp.join(Global.get_sstable_folder(), table_filename), 'w+') as fp:
         fp.write('[]')
     metadata[table_name] = {"name": table_name, "column_families": data["column_families"], "row_num": [0],
-                            "row_keys": data['row_keys']}
+                            "row_keys": data['row_keys'], "filenames": [table_filename]}
     with open(Global.get_metadata_path(), 'w') as fp:
         json.dump(metadata, fp)
-    return "", 400
+    with open(ssindex_path, 'w') as fp:
+        json.dump(memindex, fp)
+    return "", 200
 
 
 def get_args_parser():

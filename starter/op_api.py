@@ -65,11 +65,15 @@ class MemTable:
             keys_before_sharding = metadata[table_name]['row_keys']
             keys_before_sharding.sort()
 
+            keys_left = keys_before_sharding[0:500]
             keys_go = keys_before_sharding[500:]
 
             mem_index_sent = {}
 
+            type_dict = {}
+
             for key_go in keys_go:
+                type_dict[key_go] = type(key_go).__name__
                 if table_name in mem_index[key_go]:
                     if key_go not in mem_index_sent:
                         mem_index_sent[key_go] = {}
@@ -80,11 +84,17 @@ class MemTable:
 
             schema_sent = metadata[table_name]['column_families']
 
-            res = {'index': mem_index_sent, 'column_families': schema_sent, 'row_keys': keys_go}
+            res = {'index': mem_index_sent, 'column_families': schema_sent, 'row_keys': keys_go, 'types': type_dict}
 
-            post_url = 'http://{}:{}/api/sharding/{}/{}/{}/{}'.format(Global.get_tablet_hostname(),
-                                                                      Global.get_tablet_port(), table_name, key_go[0])
+            post_url = 'http://{}:{}/api/sharding/{}/{}/{}/{}'.format(Global.get_master_hostname(),
+                                                                      Global.get_master_port(),
+                                                                      Global.get_tablet_hostname(),
+                                                                      Global.get_tablet_port(), table_name, keys_go[0])
             requests.post(url=post_url, json=res)
+
+            metadata[table_name]['row_keys'] = keys_left
+            with open(Global.get_metadata_path(), 'w') as fp:
+                json.dump(metadata, fp)
 
     def retrieve(self, table_name, payload, mem_index):
         row = payload["row"]
@@ -99,7 +109,7 @@ class MemTable:
             mem_data = self.table[mem_find]["column_families"][column_family][column]
         if row in mem_index:
             if table_name in mem_index[row]:
-                with open(osp.join(Global.get_sstable_folder(), mem_index[row][table_name]['filename']), 'r') as f:
+                with open(mem_index[row][table_name]['filename'], 'r') as f:
                     sstable = json.load(f)
                 sstable_data = sstable[mem_index[row][table_name]['offset']]["column_families"][column_family][column]
         retrieve_data = sstable_data + mem_data
@@ -235,15 +245,32 @@ class MemTable:
                             json.dump(subtable, f)
                 else:
                     if len(row_table[table_name]["Not"]):
-                        subtable_path = osp.join(Global.get_sstable_folder(), metadata[table_name]["filenames"][-1])
-                        with open(subtable_path, 'r') as f:
-                            subtable = json.load(f)
+                        if metadata[table_name]["row_num"][-1] != self.max_entries:
+                            subtable_path = osp.join(Global.get_sstable_folder(), metadata[table_name]["filenames"][-1])
+                            with open(subtable_path, 'r') as f:
+                                subtable = json.load(f)
+                        else:
+                            last_file = metadata[table_name]["filenames"][-1][
+                                        0: len(metadata[table_name]["filenames"][-1]) - 5]
+                            last_file = last_file.split('_')
+                            filenum = str(int(last_file[-1]) + 1)
+                            last_file.pop()
+                            filefront = '_'.join(last_file)
+                            filename = filefront + "_" + filenum + ".json"
+                            subtable_path = osp.join(Global.get_sstable_folder(), filename)
+                            metadata[table_name]["filenames"].append(filename)
+                            metadata[table_name]["row_num"].append(0)
+                            with open(subtable_path, 'w+') as f:
+                                f.write('[]')
+                            with open(subtable_path, 'r') as f:
+                                subtable = json.load(f)
+
                         for row in row_table[table_name]["Not"]:
                             if row["row"] not in mem_index:
                                 mem_index[row["row"]] = {}
                             if table_name not in mem_index[row["row"]]:
                                 mem_index[row["row"]][table_name] = {}
-                            if metadata[table_name]["row_num"][-1] == 1000:
+                            if metadata[table_name]["row_num"][-1] == self.max_entries:
                                 for i, subtable_row in enumerate(subtable):
                                     mem_index[subtable_row["row"]][table_name]["offset"] = i
                                 with open(subtable_path, 'w') as f:

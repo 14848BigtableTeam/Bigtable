@@ -19,6 +19,7 @@ global tablets
 global tablets_reverse
 global wal_list
 global ssindex_list
+global metadata_list
 
 app = Flask(__name__)
 
@@ -105,6 +106,7 @@ def get_args_parser():
 def post_create_table():
     global metadata
     global metadata_path
+    global tablets
     table_schema = request.get_json(force=True, silent=True)
     if table_schema is None:
         return "", 400
@@ -152,6 +154,8 @@ def post_sharding(host, port, table_name, midle_row):
                                      tablets[sharding_tablet]["port"], '/api/sharding/' + table_name)
             requests.post(url, json=index)
             break
+    with open(metadata_path, 'w') as fp:
+        json.dump(metadata, fp)
     return "", 200
 
 
@@ -159,17 +163,25 @@ def post_sharding(host, port, table_name, midle_row):
 def create_tablet():
     global tablets
     global tablets_reverse
+    global metadata_list
+    global ssindex_list
+    global wal_list
     host_port = request.get_json(force=True, silent=True)
-    tablet_num = len(tablets)
-    tablets["tablet" + str(tablet_num + 1)] = {"host": host_port["host"], "port": host_port["port"]}
-    tablets_reverse[host_port["host"] + "_" + str(host_port["port"])] = "tablet" + str(tablet_num + 1)
-    wal_list["tablet" + str(tablet_num + 1)] = host_port["wal"]
-    ssindex_list["tablet" + str(tablet_num + 1)] = host_port["ssindex"]
+    if host_port['host'] + '_' + str(host_port['port']) not in tablets_reverse:
+        tablet_num = len(tablets)
+        tablets["tablet" + str(tablet_num + 1)] = {"host": host_port["host"], "port": host_port["port"]}
+        tablets_reverse[host_port["host"] + "_" + str(host_port["port"])] = "tablet" + str(tablet_num + 1)
+        wal_list["tablet" + str(tablet_num + 1)] = host_port["wal"]
+        ssindex_list["tablet" + str(tablet_num + 1)] = host_port["ssindex"]
+        metadata_list["tablet" + str(tablet_num + 1)] = host_port["metadata"]
     return '', 200
 
 
 def check_connected():
     global tablets
+    global metadata
+    global metadata_path
+    recoveried = []
     while (True):
         tablets_copy = copy.copy(tablets)
         for tablet_name, host_port in tablets_copy.items():
@@ -177,19 +189,34 @@ def check_connected():
             try:
                 connect_resp = requests.get(connect_url)
             except requests.exceptions.ConnectionError as e:
-                tablets.pop(tablet_name)
-                for recovery_tablet_name in tablets:
-                    recovery_tablet_host_port = tablets[recovery_tablet_name]
-                    recovery_url = 'http://{}:{}/api/connect'.format(recovery_tablet_host_port['host'],
-                                                                     recovery_tablet_host_port['port'])
-                    recovery_payload = {
-                        'ssindex': ssindex_list[recovery_tablet_name],
-                        'wal': wal_list[recovery_tablet_name]
-                    }
+                if tablet_name not in recoveried:
+                    recoveried.append(tablet_name)
+                    recovery_candidates = [one_tablet_name for one_tablet_name in tablets if one_tablet_name != tablet_name]
+                    if len(recovery_candidates):
+                        recovery_tablet_name = recovery_candidates[0]
 
-                    requests.get(recovery_url, json=recovery_payload)
-                    break
-                pass
+                        for table_name in metadata:
+                            metadata[table_name]['tablets'] = [one_tablet for one_tablet in metadata[table_name]['tablets']
+                                                               if
+                                                               one_tablet['hostname'] != host_port['host'] and one_tablet[
+                                                                   'port'] != host_port['port']]
+                            if len(metadata[table_name]['tablets']) == 0:
+                                metadata[table_name]['tablets'] = [{'hostname': tablets[recovery_tablet_name]['host'],
+                                                                    'port': tablets[recovery_tablet_name]['port'],
+                                                                    'row_from': '', 'row_to': ''}]
+                            with open(metadata_path, 'w') as fp:
+                                json.dump(metadata, fp)
+
+                        recovery_tablet_host_port = tablets[recovery_tablet_name]
+                        recovery_url = 'http://{}:{}/api/recovery'.format(recovery_tablet_host_port['host'],
+                                                                          recovery_tablet_host_port['port'])
+                        recovery_payload = {
+                            'ssindex': ssindex_list[tablet_name],
+                            'wal': wal_list[tablet_name],
+                            'metadata': metadata_list[tablet_name],
+                        }
+                        requests.post(recovery_url, json=recovery_payload)
+
         time.sleep(10)
 
 
@@ -207,6 +234,7 @@ if __name__ == '__main__':
     tablets_reverse = {}
     ssindex_list = {}
     wal_list = {}
+    metadata_list = {}
 
     metadata_path = osp.join(osp.split(__file__)[0], "metadata.json")
     if not osp.exists(metadata_path):

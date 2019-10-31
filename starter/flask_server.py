@@ -238,6 +238,9 @@ def connect_tablet():
 
 @app.route('/api/recovery', methods=['POST'])
 def tablet_recovery():
+    global memtable
+    global memindex
+    global metadata
     data = request.get_json(force=True, silent=True)
     with open(data["ssindex"], 'r') as f:
         recovery_ssindex = json.load(f)
@@ -247,6 +250,18 @@ def tablet_recovery():
                 memindex[row][table] = recovery_ssindex[row][table]
         else:
             memindex[row] = recovery_ssindex[row]
+    with open(data["metadata"], 'r') as f:
+        recovery_metadata = json.load(f)
+    for table in recovery_metadata:
+        if table not in metadata:
+            metadata[table] = recovery_metadata[table]
+            metadata[table]["filenames"] = [table + "_1.json"]
+            metadata[table]["row_num"] = [0]
+            filepath = osp.join(Global.get_sstable_folder(), table + "_1.json")
+            with open(filepath, 'w+') as fp:
+                fp.write('{}')
+        else:
+            metadata[table]["row_keys"] = metadata[table]["row_keys"] + recovery_metadata[table]["row_keys"]
     with open(data["wal"], 'r') as f:
         for line in f:
             walline = json.loads(line)
@@ -254,6 +269,7 @@ def tablet_recovery():
             walline.pop("table_name")
             memtable.insert(table_name, walline, memindex, metadata, ssindex_path, wal_path, recover=True,
                             tablet_recover=True)
+    return '', 200
 
 
 def get_args_parser():
@@ -333,7 +349,9 @@ def main():
     url = com_url(master_hostname, master_port, '/api/tablet')
     send_wal = osp.abspath(wal_path)
     send_ssindex = osp.abspath(ssindex_path)
-    host_port = {"host": tablet_hostname, "port": tablet_port, "wal": send_wal, "ssindex": send_ssindex}
+    send_metadata = osp.abspath(metadata_path)
+    host_port = {"host": tablet_hostname, "port": tablet_port, "wal": send_wal, "ssindex": send_ssindex,
+                 "metadata": send_metadata}
     requests.post(url, json=host_port)
 
     app.run(args.tablet_hostname, args.tablet_port)

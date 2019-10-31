@@ -1,3 +1,5 @@
+#This file includes the function of operation of the whole talbe, such as creating and deleting. 
+
 import json
 from typing import List
 import os
@@ -29,15 +31,19 @@ def create_table(table_schema: str, mem_metadata):
 
 def delete_table(Table_name, mem_metadata, memindex, memtable, ssindex_path, wal_path):
     if Table_name in mem_metadata:
+        #Get sstable file path
         Table_list = mem_metadata[Table_name]['filenames']
+        #Delete sstable file
         for Table in Table_list:
             Table_path = osp.join(Global.get_sstable_folder(), Table)
             os.remove(Table_path)
+        #Update the metadata
         mem_metadata.pop(Table_name)
         with open(Global.get_metadata_path(), 'w') as f:
             json.dump(mem_metadata, f)
 
         new_memindex = {}
+        #Update memindex
         for row in memindex:
             if Table_name in memindex[row]:
                 memindex[row].pop(Table_name)
@@ -46,10 +52,11 @@ def delete_table(Table_name, mem_metadata, memindex, memtable, ssindex_path, wal
         memindex.clear()
         for key in new_memindex:
             memindex[key] = new_memindex[key]
-
+        #Write the ssindex
         with open(ssindex_path, 'w') as f:
             json.dump(memindex, f)
         wallist = []
+        #Update WAL
         with open(wal_path, 'r') as f:
             for line in f:
                 walrow = json.loads(line)
@@ -58,6 +65,7 @@ def delete_table(Table_name, mem_metadata, memindex, memtable, ssindex_path, wal
         with open(wal_path, 'w') as f:
             for line in wallist:
                 f.write(line)
+        #Update memtable
         new_memtable = [row for row in memtable.table if row["table_name"] != Table_name]
         memtable.table.clear()
         for row in new_memtable:

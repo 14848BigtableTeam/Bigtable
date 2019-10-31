@@ -229,12 +229,16 @@ class MemTable:
 
         return res
 
+    #Spill when the memtable is full
     def spill(self, start, mem_index, ssindex_path, wal_path, metadata):
         c_table = self.table[start:]
+        #Classify the row by the table
         row_table = classify(c_table, mem_index)
+        #Classify the wal by the table 
         wal_table = wal_classify(c_table)
         for table_name in row_table:
             for subtable_name in row_table[table_name]:
+                #If the key has already been in the sstable
                 if subtable_name != "Not":
                     if len(row_table[table_name][subtable_name]):
                         subtable_path = osp.join(subtable_name)
@@ -244,6 +248,7 @@ class MemTable:
                             merge_row(subtable, row, mem_index)
                         with open(subtable_path, "w") as f:
                             json.dump(subtable, f)
+                #If the key has not already been in the sstable
                 else:
                     if len(row_table[table_name]["Not"]):
                         if metadata[table_name]["row_num"][-1] != self.max_entries:
@@ -251,6 +256,7 @@ class MemTable:
                             with open(subtable_path, 'r') as f:
                                 subtable = json.load(f)
                         else:
+                            #Create a new sstable file
                             last_file = metadata[table_name]["filenames"][-1][
                                         0: len(metadata[table_name]["filenames"][-1]) - 5]
                             last_file = last_file.split('_')
@@ -272,6 +278,7 @@ class MemTable:
                             if table_name not in mem_index[row["row"]]:
                                 mem_index[row["row"]][table_name] = {}
                             if metadata[table_name]["row_num"][-1] == self.max_entries:
+                                #Updata the offset
                                 for i, subtable_row in enumerate(subtable):
                                     mem_index[subtable_row["row"]][table_name]["offset"] = i
                                 with open(subtable_path, 'w') as f:
@@ -284,6 +291,7 @@ class MemTable:
                                 filefront = '_'.join(last_file)
                                 filename = filefront + "_" + filenum + ".json"
                                 subtable_path = osp.join(Global.get_sstable_folder(), filename)
+                                #Updata metadata
                                 metadata[table_name]["filenames"].append(filename)
                                 metadata[table_name]["row_num"].append(0)
                                 with open(subtable_path, 'w+') as f:
@@ -292,6 +300,7 @@ class MemTable:
                                     subtable = json.load(f)
                             add_row(subtable, row)
                             metadata[table_name]["row_num"][-1] += 1
+                            #Updata the path of the file which contains the row
                             mem_index[row["row"]][table_name]["filename"] = osp.join(Global.get_sstable_folder(),
                                                                                      metadata[table_name]["filenames"][
                                                                                          -1])
@@ -300,10 +309,13 @@ class MemTable:
                         with open(subtable_path, 'w') as f:
                             json.dump(subtable, f)
         self.table = self.table[0: start]
+        #Write the metadata into file
         with open(Global.get_metadata_path(), 'w') as f:
             json.dump(metadata, f)
+        #Write the memindex into file 
         with open(ssindex_path, 'w') as f:
             json.dump(mem_index, f)
+        #Modify the WAL file, delete the record which has spilled
         if start != 0:
             WALlist = []
             with open(wal_path, 'r') as f:
@@ -318,13 +330,14 @@ class MemTable:
             with open(wal_path, 'w') as f:
                 pass
 
+    #Set the max entries of the memtable
     def set_max_entries(self, payload, mem_index, ssindex_path, wal_path, metadata):
         num = payload['memtable_max']
         if num < self.max_entries:
             self.spill(num, mem_index, ssindex_path, wal_path, metadata)
         self.max_entries = num
 
-
+#Classify the row in memtable by the table
 def classify(c_table, mem_index):
     row_table = {}
     for row in c_table:
@@ -341,7 +354,7 @@ def classify(c_table, mem_index):
             row_table[table_name]["Not"].append(row)
     return row_table
 
-
+#Classify the WAL file
 def wal_classify(c_table):
     wal_table = []
     for row in c_table:
@@ -350,7 +363,7 @@ def wal_classify(c_table):
         wal_table.append(row_key + "_" + table_name)
     return wal_table
 
-
+#Merge the row and garbage collection
 def merge_row(subtable, row, mem_index):
     row_key = row["row"]
     table_name = row["table_name"]
@@ -359,11 +372,12 @@ def merge_row(subtable, row, mem_index):
         for column in subtable[row_index]["column_families"][column_family]:
             subtable_list = subtable[row_index]["column_families"][column_family][column]
             subtable_list = subtable_list + row["column_families"][column_family][column]
+            #Reserve the last five versions 
             if len(subtable_list) > 5:
                 del subtable_list[0: len(subtable_list) - 5]
             subtable[row_index]["column_families"][column_family][column] = subtable_list
 
-
+#Add a new row to sstable
 def add_row(subtable, row):
     row_key = row["row"]
     tmp = copy.copy(row)
@@ -371,7 +385,7 @@ def add_row(subtable, row):
     row_index = find_row_index(subtable, row_key)
     subtable.insert(row_index, tmp)
 
-
+#Find the index of a row through binary search
 def find_row_index(table, row_key):
     left = 0
     right = len(table) - 1
@@ -383,7 +397,7 @@ def find_row_index(table, row_key):
             right = mid - 1
     return left
 
-
+#Find the index of a row in memtable, return the last smaller row if the row is not existed
 def mem_find_row_index(table, row_key, table_name):
     left = 0
     right = len(table) - 1

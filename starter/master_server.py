@@ -101,27 +101,33 @@ def get_args_parser():
     parser.add_argument('master_port', type=int, help='master port number')
     return parser
 
-
+#Crete Table | API: 'POST' /api/tables
 @app.route('/api/tables', methods=['POST'])
 def post_create_table():
     global metadata
     global metadata_path
     global tablets
     table_schema = request.get_json(force=True, silent=True)
+    #Cannot parse json
     if table_schema is None:
         return "", 400
+    #Table exists
     if table_schema["name"] in metadata:
         return "", 409
     tablet_name = "tablet" + str(len(metadata) % len(tablets) + 1)
+    #Send Post to the tablet server
     master_api.create_table(tablets[tablet_name]["host"], tablets[tablet_name]["port"], table_schema)
+    #Updata metadata
     metadata[table_schema["name"]] = {"name": table_schema["name"], "tablets": [
         {"hostname": tablets[tablet_name]["host"], "port": str(tablets[tablet_name]["port"]), "row_from": "",
          "row_to": ""}]}
+    #Write the metadata into the file
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f)
     return "", 200
 
-
+#Sharding | API: 'POST' /api/sharding/<host>/<port>/<table_name>/<midle_row>
+#Get the request from the tablet server and choose another server to finish the sharding
 @app.route('/api/sharding/<host>/<port>/<table_name>/<midle_row>', methods=['POST'])
 def post_sharding(host, port, table_name, midle_row):
     global metadata
@@ -133,6 +139,7 @@ def post_sharding(host, port, table_name, midle_row):
     tablet_name = tablets_reverse[host + "_" + str(port)]
     tablet_number = int(tablet_name[-1:])
     tablet_list = []
+    #Cannot parse json
     if index is None:
         return "", 400
 
@@ -142,14 +149,17 @@ def post_sharding(host, port, table_name, midle_row):
             one_tablet["row_to"] = midle_row
         tablet_list.append(tablets_reverse[one_tablet["hostname"] + "_" + one_tablet["port"]])
 
+    # Choose a server
     for i in range(len(tablets)):
         sharding_tablet_number = (tablet_number + i) % len(tablets) + 1
         sharding_tablet = "tablet" + str(sharding_tablet_number)
         if sharding_tablet not in tablet_list:
+            #Updata metadata, change the row range
             metadata[table_name]["tablets"].append(
                 {"hostname": tablets[sharding_tablet]["host"], "port": str(tablets[sharding_tablet]["port"]),
                  "row_from": midle_row,
                  "row_to": row_to})
+            #Send request to another server
             url = master_api.com_url(tablets[sharding_tablet]["host"],
                                      tablets[sharding_tablet]["port"], '/api/sharding/' + table_name)
             requests.post(url, json=index)
@@ -158,7 +168,7 @@ def post_sharding(host, port, table_name, midle_row):
         json.dump(metadata, fp)
     return "", 200
 
-
+#Get tablet server messages
 @app.route('/api/tablet', methods=['POST'])
 def create_tablet():
     global tablets
@@ -168,6 +178,7 @@ def create_tablet():
     global wal_list
     host_port = request.get_json(force=True, silent=True)
     if host_port['host'] + '_' + str(host_port['port']) not in tablets_reverse:
+        #Update the tablet list
         tablet_num = len(tablets)
         tablets["tablet" + str(tablet_num + 1)] = {"host": host_port["host"], "port": host_port["port"]}
         tablets_reverse[host_port["host"] + "_" + str(host_port["port"])] = "tablet" + str(tablet_num + 1)
@@ -236,11 +247,13 @@ if __name__ == '__main__':
     wal_list = {}
     metadata_list = {}
 
+    #Create metadata file
     metadata_path = osp.join(osp.split(__file__)[0], "metadata.json")
     if not osp.exists(metadata_path):
         with open(metadata_path, 'w+') as fp:
             fp.write('{}')
 
+    # Load metadata 
     with open(metadata_path, 'r') as fp:
         metadata = json.load(fp)
 

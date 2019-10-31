@@ -1,16 +1,22 @@
 import json
-from typing import List
 import os
 import os.path as osp
 import global_v as Global
 
 
 def create_table(table_schema: str, mem_metadata):
+    """
+    Create a table within a tablet
+    :param table_schema: schema of created table
+    :param mem_metadata: metadata object
+    :return: None
+    """
     metadata_path = Global.get_metadata_path()
     sstable_folder = Global.get_sstable_folder()
 
     table_name = table_schema['name']
 
+    # table already exists in metadata
     if table_name in mem_metadata.keys():
         raise NameError('Table Already Exists')
 

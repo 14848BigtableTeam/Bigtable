@@ -1,3 +1,12 @@
+"""
+
+global_v.py
+
+Defined some global variables used across modules.
+
+"""
+
+
 class Global:
     WAL_PATH = None
     SSTABLE_FOLDER = None

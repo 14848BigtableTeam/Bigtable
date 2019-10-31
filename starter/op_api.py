@@ -1,3 +1,18 @@
+"""
+
+op_api.py
+
+Author:
+    Chi Zhang (Andrew ID: czhang5)
+    Can Xia (Andrew ID: canx)
+
+Defined the memory table data structure of BigTable, and some functions
+including insert, retrieve a cell/cells/row. To acheive the exchange
+between the memory table and table files on disk, the spill function and
+several helper function are developed in this module.
+
+"""
+
 import copy
 import json
 import requests
@@ -7,6 +22,11 @@ import global_v as Global
 
 
 class MemTable:
+    """ Memory Table
+    The overall consist of different tables' rows, each row has several
+    column families and each column family has several column, memory table
+    can store at most 5 cells of ata with the same row key, column family and column.
+    """
 
     def __init__(self):
         self.max_entries = 100
@@ -15,6 +35,18 @@ class MemTable:
 
     def insert(self, table_name, payload, mem_index, metadata, ssindex_path, wal_path, recover=False,
                tablet_recover=False):
+        """
+        Insert a cell into memory table.
+        :param table_name: table's name
+        :param payload: insertion information
+        :param mem_index: memory index object
+        :param metadata: metadata object
+        :param ssindex_path: path of ssindex file
+        :param wal_path: path of write ahead log file
+        :param recover: flag of if this function is called in recovery process
+        :param tablet_recover: flag of if this function is called in a tablet recovery process
+        :return: None
+        """
         column_family_key, column_key, row_key, cell_data = payload['column_family'], \
                                                             payload['column'], \
                                                             payload['row'], \
@@ -119,6 +151,14 @@ class MemTable:
         return {"row": row, "data": retrieve_data}
 
     def retrieve_row(self, table_name, payload, metadata, mem_index):
+        """
+        Retrieve a single row in memory table, with all cells in it
+        :param table_name: table's name
+        :param payload: query condition
+        :param metadata: metadata object
+        :param mem_index: memory index object
+        :return: all retrieved cells
+        """
         row_key = payload['row']
 
         # retrieve result in memtable
@@ -168,6 +208,15 @@ class MemTable:
         return all_res
 
     def retrieve_cells(self, table_name, payload, mem_index, metadata):
+        """
+        Given a specific table and range of row key, retrieve all related cells.
+        :param table_name: table's name
+        :param payload: query conditions
+        :param mem_index: memory index object
+        :param metadata: metadata object
+        :return: all retrieved cells
+        """
+        # parse payload
         column_family_key = payload['column_family']
         column_key = payload['column']
         row_from_key = payload['row_from']
@@ -179,6 +228,7 @@ class MemTable:
         row_from_index = min(row_from_index, len(self.table) - 1)
         row_to_index = min(row_to_index, len(self.table) - 1)
 
+        # adjust index
         while row_from_index < len(self.table) and self.table[row_from_index]['row'] < row_from_key:
             row_from_index += 1
         while row_to_index >= 0 and self.table[row_to_index]['row'] > row_to_key:
@@ -187,6 +237,7 @@ class MemTable:
         res_row_dict = {}
         res_row_keyset = set()
 
+        # search in the memory table
         for row_index in range(row_from_index, row_to_index + 1, 1):
             row_item = self.table[row_index]
             if row_item['table_name'] == table_name:
@@ -197,6 +248,7 @@ class MemTable:
                     'data': [item for item in row_item['column_families'][column_family_key][column_key]]
                 }
 
+        # search in the table files on disk
         sstable = []
         for subtable_fname in sorted(metadata[table_name]['filenames']):
             with open(osp.join(Global.get_sstable_folder(), subtable_fname), 'r') as fp:
@@ -220,6 +272,7 @@ class MemTable:
                         res_row_dict[row_key]['data'].pop(0)
                     res_row_dict[row_key]['data'].append(one_data)
 
+        # combined search results
         sorted_row_key = sorted(res_row_keyset)
         res = {
             "rows": []
@@ -319,6 +372,15 @@ class MemTable:
                 pass
 
     def set_max_entries(self, payload, mem_index, ssindex_path, wal_path, metadata):
+        """
+        Set the maximum different table's row a memory table can hold
+        :param payload: max number
+        :param mem_index: memory index object
+        :param ssindex_path: path of ssindex
+        :param wal_path: path of write ahead log
+        :param metadata: metadata object
+        :return: None
+        """
         num = payload['memtable_max']
         if num < self.max_entries:
             self.spill(num, mem_index, ssindex_path, wal_path, metadata)
@@ -373,6 +435,12 @@ def add_row(subtable, row):
 
 
 def find_row_index(table, row_key):
+    """
+    Find the position of a existing row key or the position to insert it.
+    :param table: table object parsed by table files
+    :param row_key: search row key
+    :return: index of the memory table
+    """
     left = 0
     right = len(table) - 1
     while left <= right:
@@ -385,6 +453,12 @@ def find_row_index(table, row_key):
 
 
 def mem_find_row_index(table, row_key, table_name):
+    """
+    Find the position of a existing row key or the position to insert it.
+    :param table: memory table obejct
+    :param row_key: search row key
+    :return: index of the memory table
+    """
     left = 0
     right = len(table) - 1
     while left <= right:

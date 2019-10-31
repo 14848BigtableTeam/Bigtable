@@ -1,20 +1,40 @@
+"""
+
+master_server.py
+
+Author:
+    Can Xia (Andrew ID: canx)
+    Chi Zhang (Andrew ID: czhang5)
+
+Implement several manipulations in master server of BigTable, including
+open/close tables (related to locks on tables), list all existing tables,
+get table's information (including information of tablets the table
+distributed to, and the range of row keys), and create/delete tables.
+To achieve the full functionality, we also define several helper apis
+and a sub-threading. This module basally use the Flask as the http
+server to listen on difference http request. To run this master,
+master hostname and port number need to be provided as the command
+line arguments. This module will create a file named 'metadata.json'
+in the current directory, which includes some information about table
+information.
+
+"""
+
 import copy
 import threading
 
 from flask import Flask, request
 import argparse
-import os
 import os.path as osp
 import requests
-
-global locks
-import master_api
 import json
 import time
 
+import master_api
+
+global locks
 global metadata
 global metadata_path
-
 global tablets
 global tablets_reverse
 global wal_list
@@ -26,6 +46,11 @@ app = Flask(__name__)
 
 @app.route('/api/lock/<Table_name>', methods=['POST'])
 def open_table(Table_name):
+    """
+    Open a table (add read lock on the opened table)
+    :param Table_name: the name of opened table
+    :return: empty response, status code
+    """
     global metadata
     payload = request.get_json(force=True, silent=True)
     client_id = payload['client_id']
@@ -45,6 +70,11 @@ def open_table(Table_name):
 
 @app.route('/api/lock/<Table_name>', methods=['DELETE'])
 def close_table(Table_name):
+    """
+    Close a table (release a read lock on the closed table)
+    :param Table_name: the name of opened table
+    :return: empty response, status code
+    """
     global metadata
     payload = request.get_json(force=True, silent=True)
     client_id = payload['client_id']
@@ -62,12 +92,22 @@ def close_table(Table_name):
 
 @app.route('/api/tables', methods=['GET'])
 def get_list_table():
+    """
+    List all existing tables
+    :return: names of all existing tables
+    """
     global metadata
     return {'tables': list(metadata.keys())}, 200
 
 
 @app.route('/api/tables/<Table_name>/', methods=['GET'])
 def get_table_info(Table_name):
+    """
+    Given a table name, get related information of this table
+    :param Table_name: the name of queried table
+    :return: related metadata of queried table, including address
+    of tablets the table distributed to, and the range of row keys.
+    """
     global metadata
     if Table_name not in metadata:
         return '', 404
@@ -76,6 +116,11 @@ def get_table_info(Table_name):
 
 @app.route('/api/tables/<Table_name>', methods=['DELETE'])
 def destroy_table_info(Table_name):
+    """
+    Destroy a existing table
+    :param Table_name: the name of destroyed table
+    :return: blank response and status code
+    """
     global metadata
     global metadata_path
     global locks
@@ -87,8 +132,10 @@ def destroy_table_info(Table_name):
         return '', 409
     # Destroy tables in all tablets
     for tablet in metadata[Table_name]['tablets']:
+        # Send delete requests to all tablets which the destroyed table distributed to
         delete_url = master_api.com_url(tablet['hostname'], tablet['port'], '/api/tables/{}'.format(Table_name))
         requests.delete(delete_url)
+    # Delete information in metadata
     metadata.pop(Table_name)
     with open(metadata_path, 'w') as fp:
         json.dump(metadata, fp)
@@ -96,6 +143,10 @@ def destroy_table_info(Table_name):
 
 
 def get_args_parser():
+    """
+    Construct the command line argument parser
+    :return: command line argument parser object
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('master_hostname', type=str, help='master hostname address')
     parser.add_argument('master_port', type=int, help='master port number')
@@ -178,6 +229,11 @@ def create_tablet():
 
 
 def check_connected():
+    """
+    The sub-threading of this module, it will check if a connected tablet is still connected.
+    If it's no longer connected, master can transfer its data to another tablet.
+    :return: None
+    """
     global tablets
     global metadata
     global metadata_path
@@ -187,18 +243,23 @@ def check_connected():
         for tablet_name, host_port in tablets_copy.items():
             connect_url = 'http://{}:{}/api/connect'.format(host_port['host'], host_port['port']);
             try:
+                # Try to send a request to check the connection.
                 connect_resp = requests.get(connect_url)
             except requests.exceptions.ConnectionError as e:
+                # Connection shutdown
                 if tablet_name not in recoveried:
                     recoveried.append(tablet_name)
-                    recovery_candidates = [one_tablet_name for one_tablet_name in tablets if one_tablet_name != tablet_name]
+                    recovery_candidates = [one_tablet_name for one_tablet_name in tablets if
+                                           one_tablet_name != tablet_name]
                     if len(recovery_candidates):
                         recovery_tablet_name = recovery_candidates[0]
-
+                        # Modify metadata
                         for table_name in metadata:
-                            metadata[table_name]['tablets'] = [one_tablet for one_tablet in metadata[table_name]['tablets']
+                            metadata[table_name]['tablets'] = [one_tablet for one_tablet in
+                                                               metadata[table_name]['tablets']
                                                                if
-                                                               one_tablet['hostname'] != host_port['host'] and one_tablet[
+                                                               one_tablet['hostname'] != host_port['host'] and
+                                                               one_tablet[
                                                                    'port'] != host_port['port']]
                             if len(metadata[table_name]['tablets']) == 0:
                                 metadata[table_name]['tablets'] = [{'hostname': tablets[recovery_tablet_name]['host'],
@@ -206,7 +267,7 @@ def check_connected():
                                                                     'row_from': '', 'row_to': ''}]
                             with open(metadata_path, 'w') as fp:
                                 json.dump(metadata, fp)
-
+                        # Send recovery request
                         recovery_tablet_host_port = tablets[recovery_tablet_name]
                         recovery_url = 'http://{}:{}/api/recovery'.format(recovery_tablet_host_port['host'],
                                                                           recovery_tablet_host_port['port'])
@@ -216,7 +277,7 @@ def check_connected():
                             'metadata': metadata_list[tablet_name],
                         }
                         requests.post(recovery_url, json=recovery_payload)
-
+        # Run the check every 10 seconds
         time.sleep(10)
 
 
@@ -229,6 +290,7 @@ if __name__ == '__main__':
     parser = get_args_parser()
     args = parser.parse_args()
 
+    # Initialized global variables
     locks = dict()
     tablets = {}
     tablets_reverse = {}
@@ -236,6 +298,7 @@ if __name__ == '__main__':
     wal_list = {}
     metadata_list = {}
 
+    # Create metadata file
     metadata_path = osp.join(osp.split(__file__)[0], "metadata.json")
     if not osp.exists(metadata_path):
         with open(metadata_path, 'w+') as fp:
@@ -244,7 +307,9 @@ if __name__ == '__main__':
     with open(metadata_path, 'r') as fp:
         metadata = json.load(fp)
 
+    # Start connection check thread
     check_conn_thread = threading.Thread(target=check_connected, name='ConnectCheck')
     check_conn_thread.start()
 
+    # Run server
     app.run(args.master_hostname, args.master_port)
